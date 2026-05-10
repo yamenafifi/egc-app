@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#006B5E" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>EGC App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body, #root { height: 100%; }
+      body { font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif; background: #F0F2F5; -webkit-font-smoothing: antialiased; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes scanLine { 0%,100% { top: 10%; opacity: 0.4; } 50% { top: 88%; opacity: 1; } }
+      @keyframes pulse { 0%,100% { transform: scale(1); opacity:0.7; } 50% { transform: scale(1.4); opacity:1; } }
+      @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+      .animate-in { animation: fadeIn 0.2s ease forwards; }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: #006B5E !important;
+        box-shadow: 0 0 0 3px rgba(0,107,94,0.12) !important;
+      }
+      button { font-family: inherit; }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #BEC8D5; border-radius: 4px; }
+      /* Mobile tap highlight */
+      * { -webkit-tap-highlight-color: transparent; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- jsQR: universal QR code scanner fallback for browsers without BarcodeDetector -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
