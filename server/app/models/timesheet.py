@@ -95,19 +95,29 @@ class TimesheetSubmissionModel:
     """
     A bundle of closed ClockRecords submitted by an employee for approval.
 
-    status lifecycle (the approval decision):
-      pending  → submitted, awaiting a project supervisor's decision
-      approved → approved
-      rejected → rejected, bundled records returned to "closed"
+    status lifecycle - two approval tiers, not one:
+      pending             → submitted, awaiting a project supervisor's decision
+      supervisor_approved → the project supervisor signed off (this does NOT
+                             push to egc_hr by itself - it's a "verified,
+                             ready for final review" gate). Records here are
+                             what an operations manager (attendance.final_approve)
+                             reviews and can batch-approve.
+      approved            → an operations manager gave final approval, which
+                             pushes to egc_hr as the same action (see
+                             attendance.py's final_approve_submissions)
+      rejected            → rejected by either tier, bundled records return to "closed"
 
-    push_status is a SEPARATE fact from status - approving a submission
-    and successfully landing it in egc_hr's payroll pipeline are two
-    different things (the push can fail with requires_payroll_amendment/
-    conflict/validation_error/an unreachable site, per
-    docs/EGC_APP_INTEGRATION.md's own instruction to surface that to a
-    human rather than retry automatically):
-      None                  → not yet attempted (still pending, or approved
-                               but the push hasn't run yet)
+    The supervisor's own review is recorded in reviewed_by/reviewed_at/
+    review_note as before; the operations manager's final review is
+    recorded separately in final_reviewed_by/final_reviewed_at/
+    final_review_note so both decisions stay independently visible.
+
+    push_status is a SEPARATE fact from status, set only once an operations
+    manager gives final approval - the push can fail with
+    requires_payroll_amendment/conflict/validation_error/an unreachable
+    site, per docs/EGC_APP_INTEGRATION.md's own instruction to surface that
+    to a human rather than retry automatically:
+      None                  → not yet attempted (not yet finally approved)
       "pushed"               → landed cleanly (imported/already_imported/amended)
       "requires_amendment"   → landed, but as a requires_payroll_amendment case
       "conflict"              → egc_hr rejected as a conflicting resend
@@ -145,6 +155,10 @@ class TimesheetSubmissionModel:
             "reviewed_by_name": None,
             "reviewed_at": None,
             "review_note": "",
+            "final_reviewed_by": None,
+            "final_reviewed_by_name": None,
+            "final_reviewed_at": None,
+            "final_review_note": "",
             "push_status": None,
             "erp_timesheet_id": None,
             "pushed_at": None,
@@ -169,6 +183,9 @@ class TimesheetSubmissionModel:
             "reviewed_by_name": sub.get("reviewed_by_name"),
             "reviewed_at": sub["reviewed_at"].isoformat() if sub.get("reviewed_at") else None,
             "review_note": sub.get("review_note", ""),
+            "final_reviewed_by_name": sub.get("final_reviewed_by_name"),
+            "final_reviewed_at": sub["final_reviewed_at"].isoformat() if sub.get("final_reviewed_at") else None,
+            "final_review_note": sub.get("final_review_note", ""),
             "push_status": sub.get("push_status"),
             "erp_timesheet_id": sub.get("erp_timesheet_id"),
             "pushed_at": sub["pushed_at"].isoformat() if sub.get("pushed_at") else None,

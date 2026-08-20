@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
+import { Icon } from '@/components/Icons'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useAuth } from '@/context/AuthContext'
 import { attendanceAPI, leaveAPI } from '@/services/api'
-import { normalizeLeaveRequest, normalizeSubmission, sortByMostRecent } from '@/utils/requests'
+import { normalizeSubmission, sortByMostRecent } from '@/utils/requests'
+import AttendanceCalendar from '@/components/attendance/AttendanceCalendar'
 import RequestRow from '@/components/requests/RequestRow'
 import RequestDetailSheet from '@/components/requests/RequestDetailSheet'
 
@@ -48,6 +51,7 @@ function UnsubmittedSection({ records, onSubmitted }) {
               <div style={{ fontSize: 12, fontWeight: 600, color: c.text }}>{rec.project_name}</div>
               <div style={{ fontSize: 11, color: c.textMuted }}>
                 {rec.clock_in ? new Date(rec.clock_in).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''} · {rec.hours ?? '—'}h
+                {rec.overtime_hours_requested > 0 && ` · ${rec.overtime_hours_requested}h OT`}
               </div>
             </div>
           </label>
@@ -64,72 +68,109 @@ function UnsubmittedSection({ records, onSubmitted }) {
   )
 }
 
-export default function RequestsListPage() {
+export default function AttendancePage() {
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [tab, setTab] = useState(searchParams.get('tab') === 'team' ? 'team' : 'mine')
+  const [records, setRecords] = useState([])
+  const [approvedLeaves, setApprovedLeaves] = useState([])
+  const [unsubmitted, setUnsubmitted] = useState([])
   const [mineItems, setMineItems] = useState(null)
   const [teamItems, setTeamItems] = useState(null)
-  const [unsubmitted, setUnsubmitted] = useState([])
+  const [pendingFinalCount, setPendingFinalCount] = useState(0)
   const [selected, setSelected] = useState(null)
   const [autoOpenChecked, setAutoOpenChecked] = useState(false)
 
+  const canFinalApprove = hasPermission('attendance.final_approve')
+
   const loadMine = useCallback(async () => {
     try {
-      const [leaveRes, attRes] = await Promise.all([leaveAPI.myRequests(), attendanceAPI.myRecords()])
-      setMineItems(sortByMostRecent([
-        ...leaveRes.data.requests.map(normalizeLeaveRequest),
-        ...attRes.data.submissions.map(normalizeSubmission),
-      ]))
-      setUnsubmitted((attRes.data.records || []).filter(r => r.status === 'closed'))
+      const { data } = await attendanceAPI.myRecords()
+      setRecords(data.records || [])
+      setUnsubmitted((data.records || []).filter(r => r.status === 'closed'))
+      setMineItems(sortByMostRecent((data.submissions || []).map(normalizeSubmission)))
     } catch {
       setMineItems([])
     }
   }, [])
 
+  const loadApprovedLeaves = useCallback(async () => {
+    try {
+      const { data } = await leaveAPI.myRequests()
+      setApprovedLeaves((data.requests || []).filter(r => r.status === 'Approved'))
+    } catch {
+      setApprovedLeaves([])
+    }
+  }, [])
+
   const loadTeam = useCallback(async () => {
     try {
-      const [leaveRes, attRes] = await Promise.all([leaveAPI.teamRequests(), attendanceAPI.teamSubmissions()])
-      setTeamItems(sortByMostRecent([
-        ...leaveRes.data.requests.map(normalizeLeaveRequest),
-        ...attRes.data.submissions.map(normalizeSubmission),
-      ]))
+      const { data } = await attendanceAPI.teamSubmissions()
+      setTeamItems(sortByMostRecent((data.submissions || []).map(normalizeSubmission)))
     } catch {
       setTeamItems([])
     }
   }, [])
 
-  useEffect(() => { loadMine(); loadTeam() }, [loadMine, loadTeam])
+  const loadFinalCount = useCallback(async () => {
+    if (!canFinalApprove) return
+    try {
+      const { data } = await attendanceAPI.pendingFinalApproval()
+      setPendingFinalCount((data.submissions || []).length)
+    } catch {
+      setPendingFinalCount(0)
+    }
+  }, [canFinalApprove])
 
-  // A notification link looks like /requests?tab=team&submission=<id> (or
-  // &leave=<id>) - once that tab's list has loaded, jump straight to it
-  // instead of leaving the user to find the row themselves.
+  useEffect(() => { loadMine(); loadApprovedLeaves(); loadTeam(); loadFinalCount() }, [loadMine, loadApprovedLeaves, loadTeam, loadFinalCount])
+
   useEffect(() => {
     if (autoOpenChecked) return
     const list = tab === 'mine' ? mineItems : teamItems
     if (list === null) return
     const subId = searchParams.get('submission')
-    const leaveId = searchParams.get('leave')
     if (subId) {
-      const found = list.find(i => i.kind === 'attendance' && i.id === subId)
-      if (found) setSelected({ item: found, mode: tab })
-    } else if (leaveId) {
-      const found = list.find(i => i.kind === 'leave' && i.id === leaveId)
+      const found = list.find(i => i.id === subId)
       if (found) setSelected({ item: found, mode: tab })
     }
     setAutoOpenChecked(true)
   }, [mineItems, teamItems, tab, searchParams, autoOpenChecked])
 
-  const handleActioned = () => { loadMine(); loadTeam() }
+  const handleActioned = () => { loadMine(); loadTeam(); loadFinalCount() }
   const handleTabChange = (key) => { setTab(key); setSearchParams({ tab: key }) }
 
   const activeItems = tab === 'mine' ? mineItems : teamItems
 
   const body = (
     <div style={{ maxWidth: 640 }}>
+      <div style={{ marginBottom: 16 }}>
+        <AttendanceCalendar records={records} approvedLeaves={approvedLeaves} />
+      </div>
+
+      {canFinalApprove && (
+        <button onClick={() => navigate('/attendance/final-approval')} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px',
+          background: pendingFinalCount > 0 ? c.blueBg : '#fff', border: `1px solid ${pendingFinalCount > 0 ? c.blueBorder : c.border}`,
+          borderRadius: 14, cursor: 'pointer', textAlign: 'left', fontFamily: c.font, marginBottom: 16,
+        }}>
+          <Icon name="checkCircle" size={18} color={c.blue} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>Final Approval</div>
+            <div style={{ fontSize: 11, color: c.textMuted, marginTop: 1 }}>
+              {pendingFinalCount > 0 ? `${pendingFinalCount} submission${pendingFinalCount !== 1 ? 's' : ''} awaiting your review` : 'Nothing pending'}
+            </div>
+          </div>
+          <Icon name="chevronRight" size={14} color={c.textMuted} />
+        </button>
+      )}
+
+      {tab === 'mine' && <UnsubmittedSection records={unsubmitted} onSubmitted={loadMine} />}
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[['mine', 'My Requests'], ['team', 'Team Requests']].map(([key, label]) => (
+        {[['mine', 'My Attendance'], ['team', 'Team']].map(([key, label]) => (
           <button key={key} onClick={() => handleTabChange(key)} style={{
             flex: 1, textAlign: 'center', padding: '10px 0', cursor: 'pointer',
             background: tab === key ? c.primaryDark : '#fff',
@@ -141,18 +182,16 @@ export default function RequestsListPage() {
         ))}
       </div>
 
-      {tab === 'mine' && <UnsubmittedSection records={unsubmitted} onSubmitted={loadMine} />}
-
       <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${c.border}`, overflow: 'hidden' }}>
         {activeItems === null ? (
           <div style={{ padding: '32px 16px', textAlign: 'center', color: c.textMuted, fontSize: 13 }}>Loading…</div>
         ) : activeItems.length === 0 ? (
           <div style={{ padding: '32px 16px', textAlign: 'center', color: c.textMuted, fontSize: 13 }}>
-            {tab === 'mine' ? 'You have no requests' : 'No requests need your review'}
+            {tab === 'mine' ? 'No submissions yet' : 'No submissions need your review'}
           </div>
         ) : (
           activeItems.map(item => (
-            <RequestRow key={`${item.kind}-${item.id}`} item={item} onClick={() => setSelected({ item, mode: tab })} />
+            <RequestRow key={item.id} item={item} onClick={() => setSelected({ item, mode: tab })} />
           ))
         )}
       </div>
@@ -162,7 +201,7 @@ export default function RequestsListPage() {
   if (isMobile) {
     return (
       <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Requests" />
+        <PageTopBar title="Attendance" />
         <div style={{ padding: '20px 16px 40px' }}>{body}</div>
         <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />
       </div>
@@ -172,8 +211,8 @@ export default function RequestsListPage() {
   return (
     <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Requests</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Your leave and attendance requests, and anything awaiting your review.</p>
+        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Attendance</h1>
+        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Your attendance calendar and submissions, and anything awaiting your review.</p>
       </div>
       {body}
       <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />

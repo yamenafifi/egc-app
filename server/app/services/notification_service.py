@@ -45,3 +45,18 @@ def notify_by_erp_employee_id(erp_employee_id: str, type: str, title: str, body:
     if not user:
         return None
     return notify(str(user["_id"]), type, title, body, link, related_id)
+
+
+def notify_all_with_permission(node: str, type: str, title: str, body: str,
+        link: str = None, related_id: str = None) -> None:
+    """Fans out to every active account explicitly granted `node` - e.g.
+    every operations manager, when a submission becomes ready for their
+    final approval. Sysadmin is deliberately NOT included here even though
+    require_permission() lets sysadmin bypass any node check for access
+    purposes: that's an authorization shortcut, not a claim that every
+    sysadmin wants every operations-manager notification."""
+    from app.models.user import UserModel
+    db = get_db()
+    holders = db[UserModel.COLLECTION].find({"permissions": node, "is_active": True})
+    for u in holders:
+        notify(str(u["_id"]), type, title, body, link, related_id)

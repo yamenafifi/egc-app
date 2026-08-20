@@ -87,7 +87,7 @@ def create_request():
         notify_by_erp_employee_id(
             leave_approver_erp_id, "leave_submitted", "New leave request",
             f"{user['display_name']} requested {leave_type} ({from_date} to {to_date}).",
-            link=f"/requests?tab=team&leave={str(doc['_id'])}",
+            link=f"/leaves?tab=team&leave={str(doc['_id'])}",
             related_id=str(doc["_id"]),
         )
     # If the approver has no EGC App account yet, this is silently skipped -
@@ -183,7 +183,7 @@ def _action_request(request_id, action_fn, notification_type, notification_title
     notify(
         req["user_id"], notification_type, notification_title,
         f"{user['display_name']}: {body.get('remarks') or 'No remarks.'}",
-        link="/requests?tab=mine",
+        link="/leaves?tab=mine",
         related_id=str(req["_id"]),
     )
 

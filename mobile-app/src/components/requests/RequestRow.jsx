@@ -2,9 +2,10 @@ import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
 
 const STATUS_STYLE = {
-  pending:  { bg: c.orangeBg, color: c.orange, border: c.orangeBorder, label: 'Pending' },
-  approved: { bg: c.greenBg,  color: c.green,  border: c.greenBorder,  label: 'Approved' },
-  rejected: { bg: c.redBg,    color: c.red,    border: c.redBorder,    label: 'Rejected' },
+  pending:             { bg: c.orangeBg, color: c.orange, border: c.orangeBorder, label: 'Pending' },
+  supervisor_approved: { bg: c.blueBg,   color: c.blue,   border: c.blueBorder,   label: 'Awaiting Final Approval' },
+  approved:            { bg: c.greenBg,  color: c.green,  border: c.greenBorder,  label: 'Approved' },
+  rejected:            { bg: c.redBg,    color: c.red,    border: c.redBorder,    label: 'Rejected' },
 }
 
 export function StatusBadge({ status }) {

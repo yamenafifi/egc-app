@@ -31,8 +31,11 @@ function btnStyle(kind) {
 }
 
 // item: a normalized request from utils/requests.js (or null to close).
-// mode: 'mine' | 'team' — only 'team' ever shows Approve/Reject (the
-// server re-checks authority regardless; this is UI polish only).
+// mode: 'mine' | 'team' | 'final' — 'team' shows the project supervisor's
+// Approve/Reject on a pending submission; 'final' shows the operations
+// manager's Approve/Reject on a supervisor_approved one (the single-item
+// counterpart to FinalApprovalPage's bulk action). The server re-checks
+// authority regardless in both cases; this is UI polish only.
 export default function RequestDetailSheet({ item, mode, onClose, onActioned }) {
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -54,12 +57,14 @@ export default function RequestDetailSheet({ item, mode, onClose, onActioned }) 
 
   if (!item) return null
 
-  const canAct = mode === 'team' && item.status === 'pending'
+  const canAct = (mode === 'team' && item.status === 'pending')
+    || (mode === 'final' && item.status === 'supervisor_approved')
 
   const handleApprove = async () => {
     setBusy(true)
     try {
       if (item.kind === 'leave') await leaveAPI.approve(item.id)
+      else if (mode === 'final') await attendanceAPI.finalApprove([item.id])
       else await attendanceAPI.approveSubmission(item.id, {})
       toast.success('Approved')
       onActioned()
@@ -77,6 +82,7 @@ export default function RequestDetailSheet({ item, mode, onClose, onActioned }) 
     setBusy(true)
     try {
       if (item.kind === 'leave') await leaveAPI.reject(item.id, note || undefined)
+      else if (mode === 'final') await attendanceAPI.finalReject([item.id], note)
       else await attendanceAPI.rejectSubmission(item.id, note)
       toast.success('Rejected')
       onActioned()
@@ -142,7 +148,7 @@ export default function RequestDetailSheet({ item, mode, onClose, onActioned }) 
                           {GEOFENCE_LABEL[rec.geofence_status] || 'Unknown'}
                         </span>
                         {rec.overtime_hours_requested > 0 && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: c.blue }}>OT requested: {rec.overtime_hours_requested}h</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: c.blue }}>Overtime: {rec.overtime_hours_requested}h</span>
                         )}
                       </div>
                       {rec.note && <div style={{ fontSize: 11, color: c.textSub, marginTop: 5, fontStyle: 'italic' }}>"{rec.note}"</div>}

@@ -102,6 +102,10 @@ export const attendanceAPI = {
   approveSubmission: (id, body) => api.post(`/attendance/submissions/${id}/approve`, body),
   rejectSubmission: (id, review_note) =>
     api.post(`/attendance/submissions/${id}/reject`, { review_note }),
+  pendingFinalApproval: () => api.get('/attendance/submissions/pending-final-approval'),
+  finalApprove: (submission_ids) => api.post('/attendance/submissions/final-approve', { submission_ids }),
+  finalReject: (submission_ids, review_note) =>
+    api.post('/attendance/submissions/final-reject', { submission_ids, review_note }),
 }
 
 export const leaveAPI = {

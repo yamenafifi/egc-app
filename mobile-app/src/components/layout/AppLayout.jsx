@@ -23,7 +23,9 @@ const ROUTE_MAP = {
   '/permission-templates': 'Permissions',
   '/system-settings': 'Settings',
   '/leave/new': 'Request Leave',
-  '/requests': 'Requests',
+  '/attendance': 'Attendance',
+  '/attendance/final-approval': 'Final Approval',
+  '/leaves': 'Leaves',
   '/notifications': 'Notifications',
   '/project-supervisors': 'Project Supervisors',
 }
@@ -64,6 +66,7 @@ function Breadcrumbs({ extra }) {
 function ProfileMenu({ initials, user, onLogout }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -94,6 +97,15 @@ function ProfileMenu({ initials, user, onLogout }) {
             <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>{user?.display_name}</div>
             <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{user?.username}</div>
           </div>
+          <button onClick={() => { setOpen(false); navigate('/profile') }} style={{
+            width: '100%', padding: '11px 16px', background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+            color: c.text, fontSize: 13, fontWeight: 600, fontFamily: c.font,
+            borderBottom: `1px solid ${c.border}`,
+          }}>
+            <Icon name="user" size={14} color={c.textSub} />
+            View Profile
+          </button>
           <button onClick={onLogout} style={{
             width: '100%', padding: '11px 16px', background: 'none', border: 'none',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
@@ -143,6 +155,7 @@ function BottomNav({ tabs, hasAdmin, hasPermission }) {
     { to: '/permission-templates', label: 'Permissions', icon: 'shield', perm: 'permission_templates.view' },
     { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
     { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
+    { to: '/attendance/final-approval', label: 'Final Approval', icon: 'checkCircle', perm: 'attendance.final_approve' },
   ].filter(item => hasPermission(item.perm))
 
   return (
@@ -251,27 +264,29 @@ export default function AppLayout() {
   const initials = user?.display_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 
   // ── Admin check
-  const isAdmin = user?.is_sysadmin || hasPermission('users.view_list') || hasPermission('erp.manage_project_supervisors')
+  const isAdmin = user?.is_sysadmin || hasPermission('users.view_list')
+    || hasPermission('erp.manage_project_supervisors') || hasPermission('attendance.final_approve')
 
-  // ── Desktop sidebar nav
+  // ── Desktop sidebar nav - Employee Card/Documents/Profile live as
+  // quick links from Home / the avatar menu instead, not primary nav
   const DESKTOP_NAV = [
     { to: '/home', label: 'Home', icon: 'home', perm: null },
-    { to: '/employee-card', label: 'Employee Card', icon: 'idCard', perm: null },
-    { to: '/legal-documents', label: 'Documents', icon: 'passport', perm: null },
-    { to: '/profile', label: 'Profile', icon: 'user', perm: null },
+    { to: '/attendance', label: 'Attendance', icon: 'clock', perm: null },
+    { to: '/leaves', label: 'Leaves', icon: 'calendar', perm: null },
     { to: '/users', label: 'Users', icon: 'users', perm: 'users.view_list' },
     { to: '/permission-templates', label: 'Permissions', icon: 'shield', perm: 'permission_templates.view' },
     { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
     { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
+    { to: '/attendance/final-approval', label: 'Final Approval', icon: 'checkCircle', perm: 'attendance.final_approve' },
   ]
   const visibleDesktop = DESKTOP_NAV.filter(n => !n.perm || hasPermission(n.perm))
 
-  // ── Mobile bottom tabs (always-visible ones)
+  // ── Mobile bottom tabs - Documents/Card reachable from Home's quick
+  // links, Profile from the avatar; kept out of primary nav on purpose
   const MOBILE_TABS = [
     { to: '/home', label: 'Home', icon: 'home' },
-    { to: '/legal-documents', label: 'Documents', icon: 'fileText' },
-    { to: '/employee-card', label: 'Card', icon: 'idCard' },
-    { to: '/profile', label: 'Profile', icon: 'user' },
+    { to: '/attendance', label: 'Attendance', icon: 'clock' },
+    { to: '/leaves', label: 'Leaves', icon: 'calendar' },
   ]
 
   // ── Mobile layout

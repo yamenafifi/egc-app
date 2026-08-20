@@ -33,7 +33,7 @@ export default function LeaveRequestPage() {
     try {
       await leaveAPI.create(form)
       toast.success('Leave request submitted')
-      navigate('/requests')
+      navigate('/leaves')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to submit leave request')
     } finally {

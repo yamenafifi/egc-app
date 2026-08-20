@@ -18,6 +18,8 @@ class NotificationModel:
         "leave_approved",
         "leave_rejected",
         "timesheet_submitted",
+        "timesheet_supervisor_approved",
+        "timesheet_ready_for_final_approval",
         "timesheet_approved",
         "timesheet_rejected",
         "timesheet_push_failed",

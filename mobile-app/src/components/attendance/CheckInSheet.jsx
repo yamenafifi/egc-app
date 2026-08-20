@@ -49,7 +49,6 @@ function nearestSite(sites, lat, lon) {
 export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }) {
   const [sites, setSites] = useState([])
   const [loadingSites, setLoadingSites] = useState(false)
-  const [overtimeHours, setOvertimeHours] = useState('')
   const [locating, setLocating] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -64,8 +63,7 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
   }, [open, mode])
 
   useEffect(() => {
-    if (!open) { setOvertimeHours(''); return }
-    if (mode !== 'in') return
+    if (!open || mode !== 'in') return
     setNow(Date.now())
     const interval = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(interval)
@@ -104,7 +102,6 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
         await attendanceAPI.clockOut({
           record_id: openRecord.id,
           lat: coords.latitude, lon: coords.longitude, accuracy_m: coords.accuracy,
-          overtime_hours_requested: overtimeHours ? Number(overtimeHours) : 0,
         })
         toast.success('Clocked out')
       }
@@ -147,20 +144,6 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
           </div>
         )}
 
-        {mode === 'out' && (
-          <div>
-            <label style={labelStyle}>Overtime Hours <span style={{ fontWeight: 400, textTransform: 'none', color: c.textMuted }}>(optional)</span></label>
-            <input
-              type="number" min="0" step="0.5" inputMode="decimal"
-              value={overtimeHours} onChange={e => setOvertimeHours(e.target.value)}
-              placeholder="0" style={inputStyle}
-            />
-            <p style={{ fontSize: 11, color: c.textMuted, marginTop: 6 }}>
-              Your supervisor reviews this when they approve your submission.
-            </p>
-          </div>
-        )}
-
         <button onClick={handleSubmit} disabled={disabled} style={{
           width: '100%', padding: '13px', borderRadius: 10, border: 'none',
           background: c.primaryDark, color: '#fff', fontFamily: c.font, fontSize: 14, fontWeight: 700,
@@ -173,6 +156,3 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
     </BottomSheet>
   )
 }
-
-const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, color: c.textSub, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 7 }
-const inputStyle = { width: '100%', padding: '10px 14px', border: `1.5px solid ${c.border}`, borderRadius: 8, fontSize: 14, color: c.text, background: c.surfaceRaised, fontFamily: c.font, boxSizing: 'border-box' }

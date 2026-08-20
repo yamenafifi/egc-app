@@ -17,7 +17,9 @@ import SettingsPage from '@/pages/SettingsPage'
 import EmployeeCardPage from '@/pages/EmployeeCardPage'
 import LegalDocumentsPage from '@/pages/LegalDocumentsPage'
 import LeaveRequestPage from '@/pages/LeaveRequestPage'
-import RequestsListPage from '@/pages/RequestsListPage'
+import AttendancePage from '@/pages/AttendancePage'
+import LeavesPage from '@/pages/LeavesPage'
+import FinalApprovalPage from '@/pages/FinalApprovalPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import ProjectSupervisorsPage from '@/pages/ProjectSupervisorsPage'
 
@@ -39,13 +41,15 @@ export default function App() {
               <Route path="legal-documents" element={<LegalDocumentsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="leave/new" element={<LeaveRequestPage />} />
-              <Route path="requests" element={<RequestsListPage />} />
+              <Route path="attendance" element={<AttendancePage />} />
+              <Route path="leaves" element={<LeavesPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               {/* Admin routes */}
               <Route path="users" element={<ProtectedRoute permission="users.view_list"><UsersPage /></ProtectedRoute>} />
               <Route path="permission-templates" element={<ProtectedRoute permission="permission_templates.view"><PermissionTemplatesPage /></ProtectedRoute>} />
               <Route path="system-settings" element={<ProtectedRoute permission="system.manage_settings"><SystemSettingsPage /></ProtectedRoute>} />
               <Route path="project-supervisors" element={<ProtectedRoute permission="erp.manage_project_supervisors"><ProjectSupervisorsPage /></ProtectedRoute>} />
+              <Route path="attendance/final-approval" element={<ProtectedRoute permission="attendance.final_approve"><FinalApprovalPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>

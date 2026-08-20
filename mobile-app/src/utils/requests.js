@@ -1,7 +1,7 @@
 // Normalizes leave requests and attendance submissions into one shape so
-// HomePage / RequestsListPage can merge and sort them in a single list —
-// the two source objects (LeaveRequestModel, TimesheetSubmissionModel)
-// have unrelated field names and status vocabularies.
+// LeavesPage / AttendancePage / FinalApprovalPage can all render the same
+// RequestRow/RequestDetailSheet — the two source objects (LeaveRequestModel,
+// TimesheetSubmissionModel) have unrelated field names and status vocabularies.
 
 const LEAVE_STATUS_MAP = { Open: 'pending', Approved: 'approved', Rejected: 'rejected' }
 

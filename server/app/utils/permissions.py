@@ -21,6 +21,10 @@ ERP_NODES = {
     "erp.manage_project_supervisors": "Assign employees as supervisors for a project site",
 }
 
+ATTENDANCE_NODES = {
+    "attendance.final_approve": "Give final approval on supervisor-approved attendance submissions, pushing them to egc_hr",
+}
+
 TEMPLATE_NODES = {
     "permission_templates.view": "View permission templates",
     "permission_templates.create": "Create a new permission template",
@@ -36,6 +40,7 @@ SYSTEM_NODES = {
 ALL_NODES: dict = {
     **AUTH_NODES,
     **ERP_NODES,
+    **ATTENDANCE_NODES,
     **TEMPLATE_NODES,
     **SYSTEM_NODES,
 }

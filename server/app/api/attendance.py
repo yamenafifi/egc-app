@@ -1,15 +1,26 @@
 """
 Attendance Routes  —  /api/attendance
 =======================================
-GET  /sites                          — active project sites (geofence data)
-GET  /my-open-record                 — the caller's current open clock record, or null
-POST /clock-in                       — GPS self clock-in, soft geofence check
-POST /clock-out                      — closes the caller's open record
-GET  /my-records                     — the caller's own closed/bundled records + submissions
-POST /submissions                    — bundle closed records into a submission
-GET  /team-submissions                — pending submissions the caller supervises
-POST /submissions/<id>/approve       — approve + push to egc_hr
-POST /submissions/<id>/reject        — reject, records return to "closed"
+GET  /sites                              — active project sites (geofence data)
+GET  /my-open-record                     — the caller's current open clock record, or null
+POST /clock-in                           — GPS self clock-in, soft geofence check
+POST /clock-out                          — closes the caller's open record, auto-computes overtime
+GET  /my-records                         — the caller's own closed/bundled records + submissions
+POST /submissions                        — bundle closed records into a submission
+GET  /team-submissions                    — pending submissions the caller supervises
+POST /submissions/<id>/approve           — supervisor sign-off (does NOT push to egc_hr)
+POST /submissions/<id>/reject            — supervisor reject, records return to "closed"
+GET  /submissions/pending-final-approval — supervisor-approved submissions awaiting an
+                                            operations manager's final approval
+POST /submissions/final-approve          — bulk final approval + push to egc_hr
+POST /submissions/final-reject           — bulk final rejection, records return to "closed"
+
+Two approval tiers, not one: a project supervisor's approve/reject only
+verifies the submission is legitimate - it does not touch egc_hr. Only an
+operations manager's final approval (attendance.final_approve) actually
+pushes to egc_hr's payroll pipeline, and that manager reviews everything
+supervisor-approved across every employee/project in one queue, not scoped
+to their own team.
 """
 
 from datetime import datetime, timezone
@@ -21,14 +32,20 @@ from app.utils.database import get_db
 from app.utils.geo import geofence_status
 from app.utils.time_utils import to_egc_hr_datetime_string, to_egc_hr_date_string
 from app.models.timesheet import ClockRecordModel, TimesheetSubmissionModel
-from app.middleware.auth_middleware import jwt_required_custom
+from app.middleware.auth_middleware import jwt_required_custom, require_permission
 from app.services.project_site_cache import get_site, is_supervisor_of, ProjectSiteCacheError
 from app.services.egc_hr_service import egc_hr_service, EGCHRError
-from app.services.notification_service import notify, notify_by_erp_employee_id
+from app.services.notification_service import notify, notify_by_erp_employee_id, notify_all_with_permission
 
 bp = Blueprint("attendance", __name__, url_prefix="/api/attendance")
 
 ACTIVITY_TYPE = "Execution"  # must exist as an ERPNext Activity Type - see import_record's contract
+
+# A standard day is 9 hours clock-in to clock-out (8 worked + 1 break).
+# Anything past that, at clock-out, becomes overtime automatically - the
+# employee never enters a number themselves.
+STANDARD_WORKDAY_HOURS = 8
+BREAK_HOURS = 1
 
 
 @bp.route("/sites", methods=["GET"])
@@ -120,7 +137,7 @@ def clock_out():
 
     now = datetime.now(timezone.utc)
     hours = round((now - rec["clock_in"]).total_seconds() / 3600, 2)
-    overtime_requested = body.get("overtime_hours_requested") or 0
+    overtime_requested = max(0, round(hours - BREAK_HOURS - STANDARD_WORKDAY_HOURS, 2))
 
     db[ClockRecordModel.COLLECTION].update_one(
         {"_id": rec["_id"]},
@@ -198,7 +215,7 @@ def create_submission():
                 supervisor_erp_id, "timesheet_submitted",
                 "New attendance submission",
                 f"{user['display_name']} submitted {round(total_hours, 2)}h for review.",
-                link=f"/requests?tab=team&submission={submission_id}",
+                link=f"/attendance?tab=team&submission={submission_id}",
                 related_id=submission_id,
             )
 
@@ -250,8 +267,9 @@ def get_submission(submission_id):
         return jsonify({"error": "Submission not found."}), 404
 
     is_owner = submission["user_id"] == str(user["_id"])
-    if not is_owner and not _caller_supervises_all_projects(submission.get("project_ids", [])):
-        return jsonify({"error": "You are not the owner or a supervisor of this submission."}), 403
+    is_final_approver = "attendance.final_approve" in user.get("permissions", []) or user.get("is_sysadmin")
+    if not is_owner and not is_final_approver and not _caller_supervises_all_projects(submission.get("project_ids", [])):
+        return jsonify({"error": "You are not the owner, a supervisor, or a final approver of this submission."}), 403
 
     records = db[ClockRecordModel.COLLECTION].find(
         {"_id": {"$in": [ObjectId(r) for r in submission.get("record_ids", [])]}}
@@ -266,6 +284,12 @@ def get_submission(submission_id):
 @bp.route("/submissions/<submission_id>/approve", methods=["POST"])
 @jwt_required_custom
 def approve_submission(submission_id):
+    """The project supervisor's sign-off. Does NOT push to egc_hr - it only
+    verifies the submission is legitimate and moves it into the operations
+    manager's final-approval queue. overtime_hours_approved is finalized
+    here (from the auto-computed overtime_hours_requested, or the
+    supervisor's override) since this is where a human with per-record
+    detail last touches each record before it's pushed."""
     db = get_db()
     user = g.current_user
     body = request.get_json(silent=True) or {}
@@ -283,86 +307,35 @@ def approve_submission(submission_id):
     records = list(db[ClockRecordModel.COLLECTION].find(
         {"_id": {"$in": [ObjectId(r) for r in submission["record_ids"]]}}
     ))
-
-    payloads = []
     for rec in records:
         overtime_approved = overtime_overrides.get(str(rec["_id"]), rec.get("overtime_hours_requested") or 0)
         db[ClockRecordModel.COLLECTION].update_one(
             {"_id": rec["_id"]}, {"$set": {"overtime_hours_approved": overtime_approved}}
         )
-        external_work_record_id = f"EGCAPP-WR-{rec['_id']}"
-        payload = {
-            "external_work_record_id": external_work_record_id,
-            "revision": 1,
-            "employee_reference": rec["erp_employee_id"],
-            "work_date": to_egc_hr_date_string(rec["clock_in"]),
-            "payroll_status": "P",
-            "approved_overtime_hours": overtime_approved,
-            "clock_in": to_egc_hr_datetime_string(rec["clock_in"]),
-            "clock_out": to_egc_hr_datetime_string(rec["clock_out"]) if rec.get("clock_out") else None,
-            "clock_in_location": rec.get("clock_in_location"),
-            "clock_out_location": rec.get("clock_out_location"),
-            "accounting_project": rec["project_id"],
-            "project_segments": [{
-                "project": rec["project_id"],
-                "activity": ACTIVITY_TYPE,
-                "from": to_egc_hr_datetime_string(rec["clock_in"]),
-                "to": to_egc_hr_datetime_string(rec["clock_out"]),
-            }] if rec.get("clock_out") else [],
-            "approval": {
-                "status": "HR_APPROVED",
-                "approved_by": user["username"],
-                "approved_at": to_egc_hr_datetime_string(datetime.now(timezone.utc)),
-            },
-        }
-        payloads.append((rec["_id"], external_work_record_id, payload))
-
-    push_status, push_detail = "pushed", None
-    try:
-        if len(payloads) == 1:
-            result = egc_hr_service.import_work_record(payloads[0][2])
-            results = [result]
-        else:
-            batch = egc_hr_service.import_work_record_batch([p[2] for p in payloads])
-            results = batch.get("results", [])
-
-        for (_id, ext_id, _payload), result in zip(payloads, results):
-            db[ClockRecordModel.COLLECTION].update_one(
-                {"_id": _id}, {"$set": {"external_work_record_id": ext_id}}
-            )
-            r = result.get("result")
-            if r not in ("imported", "already_imported", "amended"):
-                push_status = r if r else "failed"
-                push_detail = result.get("message")
-    except EGCHRError as e:
-        push_status, push_detail = "failed", str(e)
 
     now = datetime.now(timezone.utc)
     db[TimesheetSubmissionModel.COLLECTION].update_one(
         {"_id": submission["_id"]},
         {"$set": {
-            "status": "approved",
+            "status": "supervisor_approved",
             "reviewed_by": str(user["_id"]), "reviewed_by_name": user["display_name"],
             "reviewed_at": now, "review_note": body.get("review_note", ""),
-            "push_status": push_status,
-            "pushed_at": now if push_status == "pushed" else None,
-            "pushed_by": str(user["_id"]) if push_status == "pushed" else None,
         }},
     )
 
     notify(
-        submission["user_id"], "timesheet_approved", "Attendance submission approved",
-        f"{user['display_name']} approved your {submission.get('total_hours', 0)}h submission.",
-        link="/requests?tab=mine",
+        submission["user_id"], "timesheet_supervisor_approved", "Attendance submission approved by supervisor",
+        f"{user['display_name']} approved your {submission.get('total_hours', 0)}h submission - pending final review.",
+        link="/attendance?tab=mine",
         related_id=submission_id,
     )
-    if push_status != "pushed":
-        notify(
-            str(user["_id"]), "timesheet_push_failed", "Attendance push to payroll failed",
-            f"Submission for {submission['display_name']} was approved but didn't fully reach payroll ({push_status}). {push_detail or ''}".strip(),
-            link=f"/requests?tab=team&submission={submission_id}",
-            related_id=submission_id,
-        )
+    notify_all_with_permission(
+        "attendance.final_approve", "timesheet_ready_for_final_approval", "Submission ready for final approval",
+        f"{submission['display_name']}'s {submission.get('total_hours', 0)}h submission was approved by "
+        f"{user['display_name']} and is ready for final review.",
+        link="/attendance/final-approval",
+        related_id=submission_id,
+    )
 
     updated = db[TimesheetSubmissionModel.COLLECTION].find_one({"_id": submission["_id"]})
     return jsonify({"submission": TimesheetSubmissionModel.to_public(updated)}), 200
@@ -403,9 +376,176 @@ def reject_submission(submission_id):
     notify(
         submission["user_id"], "timesheet_rejected", "Attendance submission rejected",
         f"{user['display_name']} rejected your submission: {review_note}",
-        link="/requests?tab=mine",
+        link="/attendance?tab=mine",
         related_id=submission_id,
     )
 
     updated = db[TimesheetSubmissionModel.COLLECTION].find_one({"_id": submission["_id"]})
     return jsonify({"submission": TimesheetSubmissionModel.to_public(updated)}), 200
+
+
+def _push_submission_to_egc_hr(db, submission: dict, actioning_user: dict) -> tuple[str, str | None]:
+    """Builds one import_record/import_batch payload per clock record and
+    pushes it to egc_hr. Reads overtime_hours_approved as already finalized
+    by the supervisor's own approval step - final approval doesn't
+    re-negotiate hours, it decides whether the submission is ready to
+    actually land in payroll."""
+    records = list(db[ClockRecordModel.COLLECTION].find(
+        {"_id": {"$in": [ObjectId(r) for r in submission["record_ids"]]}}
+    ))
+
+    payloads = []
+    for rec in records:
+        external_work_record_id = rec.get("external_work_record_id") or f"EGCAPP-WR-{rec['_id']}"
+        payload = {
+            "external_work_record_id": external_work_record_id,
+            "revision": 1,
+            "employee_reference": rec["erp_employee_id"],
+            "work_date": to_egc_hr_date_string(rec["clock_in"]),
+            "payroll_status": "P",
+            "approved_overtime_hours": rec.get("overtime_hours_approved") or 0,
+            "clock_in": to_egc_hr_datetime_string(rec["clock_in"]),
+            "clock_out": to_egc_hr_datetime_string(rec["clock_out"]) if rec.get("clock_out") else None,
+            "clock_in_location": rec.get("clock_in_location"),
+            "clock_out_location": rec.get("clock_out_location"),
+            "accounting_project": rec["project_id"],
+            "project_segments": [{
+                "project": rec["project_id"],
+                "activity": ACTIVITY_TYPE,
+                "from": to_egc_hr_datetime_string(rec["clock_in"]),
+                "to": to_egc_hr_datetime_string(rec["clock_out"]),
+            }] if rec.get("clock_out") else [],
+            "approval": {
+                "status": "HR_APPROVED",
+                "approved_by": actioning_user["username"],
+                "approved_at": to_egc_hr_datetime_string(datetime.now(timezone.utc)),
+            },
+        }
+        payloads.append((rec["_id"], external_work_record_id, payload))
+
+    push_status, push_detail = "pushed", None
+    try:
+        if len(payloads) == 1:
+            result = egc_hr_service.import_work_record(payloads[0][2])
+            results = [result]
+        else:
+            batch = egc_hr_service.import_work_record_batch([p[2] for p in payloads])
+            results = batch.get("results", [])
+
+        for (_id, ext_id, _payload), result in zip(payloads, results):
+            db[ClockRecordModel.COLLECTION].update_one(
+                {"_id": _id}, {"$set": {"external_work_record_id": ext_id}}
+            )
+            r = result.get("result")
+            if r not in ("imported", "already_imported", "amended"):
+                push_status = r if r else "failed"
+                push_detail = result.get("message")
+    except EGCHRError as e:
+        push_status, push_detail = "failed", str(e)
+
+    return push_status, push_detail
+
+
+@bp.route("/submissions/pending-final-approval", methods=["GET"])
+@require_permission("attendance.final_approve")
+def pending_final_approval():
+    db = get_db()
+    subs = db[TimesheetSubmissionModel.COLLECTION].find({"status": "supervisor_approved"}).sort("reviewed_at", -1)
+    return jsonify({"submissions": [TimesheetSubmissionModel.to_public(s) for s in subs]}), 200
+
+
+@bp.route("/submissions/final-approve", methods=["POST"])
+@require_permission("attendance.final_approve")
+def final_approve_submissions():
+    """Bulk: the operations manager selects any number of
+    supervisor_approved submissions and approves them together. Each one
+    pushes to egc_hr independently, so one bad submission in the batch
+    doesn't block the rest - results report per-submission outcome."""
+    db = get_db()
+    user = g.current_user
+    body = request.get_json(silent=True) or {}
+    submission_ids = body.get("submission_ids") or []
+    if not submission_ids:
+        return jsonify({"error": "submission_ids is required and must be non-empty."}), 400
+
+    results = []
+    for submission_id in submission_ids:
+        submission = db[TimesheetSubmissionModel.COLLECTION].find_one({"_id": ObjectId(submission_id)})
+        if not submission or submission["status"] != "supervisor_approved":
+            results.append({"submission_id": submission_id, "ok": False, "error": "Not awaiting final approval."})
+            continue
+
+        push_status, push_detail = _push_submission_to_egc_hr(db, submission, user)
+        now = datetime.now(timezone.utc)
+        db[TimesheetSubmissionModel.COLLECTION].update_one(
+            {"_id": submission["_id"]},
+            {"$set": {
+                "status": "approved",
+                "final_reviewed_by": str(user["_id"]), "final_reviewed_by_name": user["display_name"],
+                "final_reviewed_at": now, "final_review_note": body.get("review_note", ""),
+                "push_status": push_status,
+                "pushed_at": now if push_status == "pushed" else None,
+                "pushed_by": str(user["_id"]) if push_status == "pushed" else None,
+            }},
+        )
+
+        notify(
+            submission["user_id"], "timesheet_approved", "Attendance submission fully approved",
+            f"Your {submission.get('total_hours', 0)}h submission has been fully approved.",
+            link="/attendance?tab=mine",
+            related_id=submission_id,
+        )
+        if push_status != "pushed":
+            notify(
+                str(user["_id"]), "timesheet_push_failed", "Attendance push to payroll failed",
+                f"Submission for {submission['display_name']} was approved but didn't fully reach payroll "
+                f"({push_status}). {push_detail or ''}".strip(),
+                link="/attendance/final-approval",
+                related_id=submission_id,
+            )
+        results.append({"submission_id": submission_id, "ok": True, "push_status": push_status})
+
+    return jsonify({"results": results}), 200
+
+
+@bp.route("/submissions/final-reject", methods=["POST"])
+@require_permission("attendance.final_approve")
+def final_reject_submissions():
+    db = get_db()
+    user = g.current_user
+    body = request.get_json(silent=True) or {}
+    submission_ids = body.get("submission_ids") or []
+    review_note = body.get("review_note")
+    if not submission_ids:
+        return jsonify({"error": "submission_ids is required and must be non-empty."}), 400
+    if not review_note:
+        return jsonify({"error": "review_note is required when rejecting."}), 400
+
+    results = []
+    for submission_id in submission_ids:
+        submission = db[TimesheetSubmissionModel.COLLECTION].find_one({"_id": ObjectId(submission_id)})
+        if not submission or submission["status"] != "supervisor_approved":
+            results.append({"submission_id": submission_id, "ok": False, "error": "Not awaiting final approval."})
+            continue
+
+        db[TimesheetSubmissionModel.COLLECTION].update_one(
+            {"_id": submission["_id"]},
+            {"$set": {
+                "status": "rejected",
+                "final_reviewed_by": str(user["_id"]), "final_reviewed_by_name": user["display_name"],
+                "final_reviewed_at": datetime.now(timezone.utc), "final_review_note": review_note,
+            }},
+        )
+        db[ClockRecordModel.COLLECTION].update_many(
+            {"_id": {"$in": [ObjectId(r) for r in submission["record_ids"]]}},
+            {"$set": {"status": "closed", "submission_id": None}},
+        )
+        notify(
+            submission["user_id"], "timesheet_rejected", "Attendance submission rejected",
+            f"{user['display_name']} rejected your submission at final review: {review_note}",
+            link="/attendance?tab=mine",
+            related_id=submission_id,
+        )
+        results.append({"submission_id": submission_id, "ok": True})
+
+    return jsonify({"results": results}), 200

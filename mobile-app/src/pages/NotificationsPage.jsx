@@ -11,7 +11,9 @@ import { registerPush, unregisterPush, getPushSubscriptionState } from '@/servic
 
 const TYPE_ICON = {
   leave_submitted: 'calendar', leave_approved: 'calendar', leave_rejected: 'calendar',
-  timesheet_submitted: 'clock', timesheet_approved: 'clock', timesheet_rejected: 'clock',
+  timesheet_submitted: 'clock', timesheet_supervisor_approved: 'clock',
+  timesheet_ready_for_final_approval: 'checkCircle',
+  timesheet_approved: 'clock', timesheet_rejected: 'clock',
   timesheet_push_failed: 'alertCircle',
 }
 
