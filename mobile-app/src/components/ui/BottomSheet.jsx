@@ -1,9 +1,10 @@
 // BottomSheet — slide-up modal for mobile, centered dialog on desktop
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
 
-export default function BottomSheet({ open, onClose, title, children, maxHeight = '85dvh' }) {
+export default function BottomSheet({ open, onClose, title, children, maxHeight = 'calc(85dvh - env(safe-area-inset-bottom))' }) {
   // Prevent body scroll when open
   useEffect(() => {
     if (open) {
@@ -16,7 +17,14 @@ export default function BottomSheet({ open, onClose, title, children, maxHeight 
 
   if (!open) return null
 
-  return (
+  // Rendered via a portal straight onto <body> - AppLayout's mobile route
+  // wrapper animates `transform` on page change (mobilePageSlide), and any
+  // ancestor with an active transform/animation becomes the containing
+  // block for descendant position:fixed elements. Left in the normal tree,
+  // this sheet would be positioned relative to that (shorter, animated)
+  // wrapper instead of the real viewport - which is exactly why its bottom
+  // portion used to render clipped behind the mobile bottom nav.
+  return createPortal((
     <div
       onClick={onClose}
       style={{
@@ -60,10 +68,10 @@ export default function BottomSheet({ open, onClose, title, children, maxHeight 
         </div>
 
         {/* Content */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px 32px' }}>
+        <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px calc(24px + env(safe-area-inset-bottom))' }}>
           {children}
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }

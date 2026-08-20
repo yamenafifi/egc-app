@@ -55,7 +55,7 @@ function UnsubmittedSection({ records, onSubmitted }) {
       </div>
       <button onClick={handleSubmit} disabled={submitting} style={{
         width: '100%', padding: '10px', borderRadius: 8, border: 'none',
-        background: c.primary, color: '#fff', fontFamily: c.font, fontSize: 13, fontWeight: 700,
+        background: c.primaryDark, color: '#fff', fontFamily: c.font, fontSize: 13, fontWeight: 700,
         cursor: submitting ? 'default' : 'pointer', opacity: submitting ? 0.7 : 1,
       }}>
         {submitting ? 'Submitting…' : `Submit ${selected.size} Record${selected.size !== 1 ? 's' : ''}`}
@@ -132,10 +132,10 @@ export default function RequestsListPage() {
         {[['mine', 'My Requests'], ['team', 'Team Requests']].map(([key, label]) => (
           <button key={key} onClick={() => handleTabChange(key)} style={{
             flex: 1, textAlign: 'center', padding: '10px 0', cursor: 'pointer',
-            background: tab === key ? c.primary : '#fff',
+            background: tab === key ? c.primaryDark : '#fff',
             borderRadius: 10, fontSize: 13, fontWeight: 700,
             color: tab === key ? '#fff' : c.textSub,
-            border: `1px solid ${tab === key ? c.primary : c.border}`,
+            border: `1px solid ${tab === key ? c.primaryDark : c.border}`,
             fontFamily: c.font,
           }}>{label}</button>
         ))}

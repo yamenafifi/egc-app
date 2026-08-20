@@ -108,6 +108,8 @@ export default function HomePage() {
 
   const activeItems = tab === 'mine' ? mineItems : teamItems
   const elapsed = openRecord ? formatElapsed(now - new Date(openRecord.clock_in).getTime()) : null
+  const erpLinked = !!user?.erp_employee_id
+  const checkInDisabled = openRecord === undefined || !erpLinked
 
   const content = (
     <div style={{ padding: isMobile ? '16px 16px 32px' : '0', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: isMobile ? '100%' : 640 }}>
@@ -123,14 +125,14 @@ export default function HomePage() {
           </div>
         )}
         <button
-          disabled={openRecord === undefined}
+          disabled={checkInDisabled}
           onClick={() => setCheckSheet(openRecord ? 'out' : 'in')}
           style={{
             width: '100%', padding: '11px',
-            background: openRecord ? c.redBg : c.primary,
+            background: openRecord ? c.redBg : c.primaryDark,
             border: openRecord ? `1px solid ${c.redBorder}` : 'none',
-            borderRadius: 10, cursor: openRecord === undefined ? 'default' : 'pointer',
-            opacity: openRecord === undefined ? 0.6 : 1,
+            borderRadius: 10, cursor: checkInDisabled ? 'default' : 'pointer',
+            opacity: checkInDisabled ? 0.5 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             fontFamily: c.font, fontSize: 14, fontWeight: 700, color: openRecord ? c.red : '#fff',
           }}>
@@ -139,6 +141,7 @@ export default function HomePage() {
         </button>
         <div style={{ textAlign: 'center', fontSize: 11, color: c.textMuted, marginTop: 6 }}>
           {openRecord === undefined ? 'Checking status…'
+            : !erpLinked ? 'Your account is not linked to an ERP employee record'
             : openRecord ? `${openRecord.project_name} · ${elapsed} elapsed`
             : 'Not clocked in'}
         </div>

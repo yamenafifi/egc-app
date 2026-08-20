@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
-import { Icon } from '@/components/Icons'
 import BottomSheet from '@/components/ui/BottomSheet'
 import { attendanceAPI } from '@/services/api'
 
@@ -19,16 +18,41 @@ function getPosition() {
   })
 }
 
+function haversineDistanceM(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const toRad = deg => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+// Nearest site by straight-line distance, not "the one whose geofence you're
+// inside" - if nobody's geofence contains you (bad GPS, a genuinely offsite
+// task), the closest site is still the best guess, and the server's own
+// geofence_status check (computed against the real radius once a project_id
+// is chosen) is what actually flags it for the reviewing supervisor. This
+// mirrors clock-in's existing soft-check philosophy: never block, just flag.
+function nearestSite(sites, lat, lon) {
+  let best = null
+  let bestDist = Infinity
+  for (const s of sites) {
+    if (s.latitude == null || s.longitude == null) continue
+    const d = haversineDistanceM(lat, lon, s.latitude, s.longitude)
+    if (d < bestDist) { bestDist = d; best = s }
+  }
+  return best
+}
+
 // mode: 'in' | 'out'. openRecord is required for 'out' (the caller's
 // current open ClockRecord, to show which project it'll close).
 export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }) {
   const [sites, setSites] = useState([])
-  const [siteId, setSiteId] = useState('')
-  const [note, setNote] = useState('')
-  const [overtimeHours, setOvertimeHours] = useState('')
   const [loadingSites, setLoadingSites] = useState(false)
+  const [overtimeHours, setOvertimeHours] = useState('')
   const [locating, setLocating] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
     if (!open || mode !== 'in') return
@@ -40,12 +64,16 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
   }, [open, mode])
 
   useEffect(() => {
-    if (!open) { setSiteId(''); setNote(''); setOvertimeHours('') }
-  }, [open])
+    if (!open) { setOvertimeHours(''); return }
+    if (mode !== 'in') return
+    setNow(Date.now())
+    const interval = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [open, mode])
 
   const handleSubmit = async () => {
-    if (mode === 'in' && !siteId) {
-      toast.error('Select a project site first.')
+    if (mode === 'in' && sites.length === 0) {
+      toast.error('No active project sites are configured. Contact your admin.')
       return
     }
     setLocating(true)
@@ -61,10 +89,15 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
     setSubmitting(true)
     try {
       if (mode === 'in') {
+        const site = nearestSite(sites, coords.latitude, coords.longitude)
+        if (!site) {
+          toast.error('Could not determine your project site. Contact your admin.')
+          setSubmitting(false)
+          return
+        }
         await attendanceAPI.clockIn({
-          project_id: siteId,
+          project_id: site.name,
           lat: coords.latitude, lon: coords.longitude, accuracy_m: coords.accuracy,
-          note,
         })
         toast.success('Clocked in')
       } else {
@@ -85,25 +118,25 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
   }
 
   const busy = locating || submitting
+  const disabled = busy || (mode === 'in' && (loadingSites || sites.length === 0))
+
+  const buttonLabel = locating ? 'Getting location…'
+    : submitting ? (mode === 'in' ? 'Checking in…' : 'Checking out…')
+    : mode === 'in' && loadingSites ? 'Loading…'
+    : mode === 'in' && sites.length === 0 ? 'No sites available'
+    : mode === 'in' ? 'Check In' : 'Check Out'
 
   return (
     <BottomSheet open={open} onClose={onClose} title={mode === 'in' ? 'Check In' : 'Check Out'}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {mode === 'in' ? (
-          <div>
-            <label style={labelStyle}>Project Site</label>
-            {loadingSites ? (
-              <div style={{ fontSize: 13, color: c.textMuted, padding: '8px 0' }}>Loading sites…</div>
-            ) : sites.length === 0 ? (
-              <div style={{ fontSize: 13, color: c.textMuted, padding: '8px 0' }}>No active project sites found.</div>
-            ) : (
-              <select value={siteId} onChange={e => setSiteId(e.target.value)} style={inputStyle}>
-                <option value="" disabled>Select a site…</option>
-                {sites.map(s => (
-                  <option key={s.name} value={s.name}>{s.project_name || s.name}</option>
-                ))}
-              </select>
-            )}
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <div style={{ fontSize: 40, fontWeight: 800, color: c.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>
+              {new Date(now).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
+            <div style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>
+              {new Date(now).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </div>
           </div>
         ) : (
           <div style={{ padding: '12px 14px', background: c.bg, borderRadius: 10 }}>
@@ -111,13 +144,6 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
             <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>
               Clocked in {openRecord?.clock_in ? new Date(openRecord.clock_in).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
             </div>
-          </div>
-        )}
-
-        {mode === 'in' && (
-          <div>
-            <label style={labelStyle}>Note <span style={{ fontWeight: 400, textTransform: 'none', color: c.textMuted }}>(optional)</span></label>
-            <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. covering the east block today" style={inputStyle} />
           </div>
         )}
 
@@ -135,20 +161,13 @@ export default function CheckInSheet({ open, mode, openRecord, onClose, onDone }
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, padding: '10px 12px', background: c.blueBg, border: `1px solid ${c.blueBorder}`, borderRadius: 8 }}>
-          <Icon name="mapPin" size={14} color={c.blue} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span style={{ fontSize: 11, color: c.textSub }}>
-            We'll use your device's current location to {mode === 'in' ? 'check you in' : 'check you out'}.
-          </span>
-        </div>
-
-        <button onClick={handleSubmit} disabled={busy} style={{
+        <button onClick={handleSubmit} disabled={disabled} style={{
           width: '100%', padding: '13px', borderRadius: 10, border: 'none',
-          background: c.primary, color: '#fff', fontFamily: c.font, fontSize: 14, fontWeight: 700,
-          cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1,
+          background: c.primaryDark, color: '#fff', fontFamily: c.font, fontSize: 14, fontWeight: 700,
+          cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.6 : 1,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}>
-          {locating ? 'Getting location…' : submitting ? 'Submitting…' : mode === 'in' ? 'Check In' : 'Check Out'}
+          {buttonLabel}
         </button>
       </div>
     </BottomSheet>

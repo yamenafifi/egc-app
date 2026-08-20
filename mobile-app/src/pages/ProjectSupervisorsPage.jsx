@@ -91,7 +91,7 @@ function EditSupervisorsSheet({ project, onClose, onSaved }) {
 
         <button onClick={handleSave} disabled={saving} style={{
           width: '100%', padding: '11px', borderRadius: 9, border: 'none',
-          background: c.primary, color: '#fff', fontFamily: c.font, fontSize: 13, fontWeight: 700,
+          background: c.primaryDark, color: '#fff', fontFamily: c.font, fontSize: 13, fontWeight: 700,
           cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.7 : 1,
         }}>
           {saving ? 'Saving…' : 'Save Supervisors'}
