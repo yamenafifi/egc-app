@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "egc-app-backend",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["server/run.py"],
+      "port": 5000
+    },
+    {
+      "name": "egc-app-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "mobile-app"],
+      "port": 3000
+    }
+  ]
+}

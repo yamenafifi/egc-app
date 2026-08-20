@@ -234,6 +234,35 @@ def team_submissions():
     return jsonify({"submissions": [TimesheetSubmissionModel.to_public(s) for s in visible]}), 200
 
 
+@bp.route("/submissions/<submission_id>", methods=["GET"])
+@jwt_required_custom
+def get_submission(submission_id):
+    """Expanded view of one submission incl. its underlying clock records -
+    the owner sees their own; a supervisor or sysadmin reviewing it needs
+    per-record geofence_status/hours/note, not just the submission's
+    aggregate totals, to actually judge it (see ClockRecordModel's own
+    docstring: "the reviewing supervisor sees the flag and can reject if
+    it looks wrong" - that requires the records, not just the total)."""
+    db = get_db()
+    user = g.current_user
+    submission = db[TimesheetSubmissionModel.COLLECTION].find_one({"_id": ObjectId(submission_id)})
+    if not submission:
+        return jsonify({"error": "Submission not found."}), 404
+
+    is_owner = submission["user_id"] == str(user["_id"])
+    if not is_owner and not _caller_supervises_all_projects(submission.get("project_ids", [])):
+        return jsonify({"error": "You are not the owner or a supervisor of this submission."}), 403
+
+    records = db[ClockRecordModel.COLLECTION].find(
+        {"_id": {"$in": [ObjectId(r) for r in submission.get("record_ids", [])]}}
+    ).sort("clock_in", 1)
+
+    return jsonify({
+        "submission": TimesheetSubmissionModel.to_public(submission),
+        "records": [ClockRecordModel.to_public(r) for r in records],
+    }), 200
+
+
 @bp.route("/submissions/<submission_id>/approve", methods=["POST"])
 @jwt_required_custom
 def approve_submission(submission_id):
