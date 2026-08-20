@@ -8,3 +8,4 @@ requests==2.32.3
 marshmallow==3.21.3
 flasgger==0.9.7.1
 gunicorn==22.0.0
+pywebpush==2.0.0

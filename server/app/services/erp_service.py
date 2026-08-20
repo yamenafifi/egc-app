@@ -115,6 +115,26 @@ class ERPNextService:
     def get_employee(self, employee_id):
         return self._get(f"api/resource/Employee/{employee_id}").get("data", {})
 
+    def get_employee_by_user_id(self, user_id: str) -> dict:
+        """Resolves a Frappe User (e.g. a Leave Application's leave_approver,
+        which is a Link to User, not Employee) back to the Employee record
+        linked to that same User - EGC App only knows Employee identities,
+        so this is the bridge whenever an ERPNext field speaks in Users."""
+        if not user_id:
+            return {}
+        params = {
+            "fields": '["name"]',
+            "filters": f'[["user_id", "=", "{user_id}"]]',
+            "limit_page_length": 1,
+        }
+        try:
+            results = self._get("api/resource/Employee", params).get("data", [])
+            if results:
+                return self.get_employee(results[0]["name"])
+        except ERPNextError:
+            pass
+        return {}
+
     def get_employee_by_iqama(self, iqama_number):
         # We cannot filter directly by custom_iqama_number due to ERPNext REST API restrictions.
         # We must fetch all Active employees and filter manually.
@@ -253,6 +273,17 @@ class ERPNextService:
 
     def get_project(self, project_id):
         return self._get(f"api/resource/Project/{project_id}").get("data", {})
+
+    # ── Leave ─────────────────────────────────────────────────────────────────
+
+    def get_leave_types(self):
+        params = {
+            "fields": '["name"]',
+            "limit_page_length": 0,
+            "order_by": "name asc",
+        }
+        data = self._get("api/resource/Leave Type", params)
+        return [row["name"] for row in data.get("data", [])]
 
     # ── Timesheet push ────────────────────────────────────────────────────────
 

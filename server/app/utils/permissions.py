@@ -18,6 +18,7 @@ AUTH_NODES = {
 ERP_NODES = {
     "erp.view_employee_list": "Pull and view employee list from ERPNext",
     "erp.sync_employee": "Sync a specific employee record from ERPNext",
+    "erp.manage_project_supervisors": "Assign employees as supervisors for a project site",
 }
 
 TEMPLATE_NODES = {

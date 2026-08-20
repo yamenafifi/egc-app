@@ -37,12 +37,18 @@ def create_app() -> Flask:
     from app.api.erp import bp as erp_bp
     from app.api.permission_templates import bp as templates_bp
     from app.api.settings import bp as settings_bp
+    from app.api.attendance import bp as attendance_bp
+    from app.api.leave import bp as leave_bp
+    from app.api.notifications import bp as notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(erp_bp)
     app.register_blueprint(templates_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(attendance_bp)
+    app.register_blueprint(leave_bp)
+    app.register_blueprint(notifications_bp)
 
     @app.route("/api/health")
     def health():

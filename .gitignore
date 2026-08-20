@@ -1,1 +1,18 @@
 .gitignore
+
+# Secrets / local config
+.env
+.env.local
+
+# Node
+node_modules/
+mobile-app/dist/
+
+# Python
+__pycache__/
+*.pyc
+server/venv/
+server/.venv/
+
+# OS
+.DS_Store

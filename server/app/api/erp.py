@@ -9,6 +9,8 @@ GET  /api/erp/ping             — check ERPNext connectivity
 from flask import Blueprint, request, jsonify, g
 
 from app.services.erp_service import erp_service, ERPNextError
+from app.services.egc_hr_service import egc_hr_service, EGCHRError
+from app.services.project_site_cache import invalidate as invalidate_project_site_cache
 from app.middleware.auth_middleware import require_permission, jwt_required_custom
 
 bp = Blueprint("erp", __name__, url_prefix="/api/erp")
@@ -63,6 +65,38 @@ def list_projects():
     except ERPNextError as e:
         return jsonify({"error": str(e)}), e.status_code
     return jsonify({"projects": projects}), 200
+
+
+@bp.route("/project-sites", methods=["GET"])
+@require_permission("erp.manage_project_supervisors")
+def project_sites():
+    """Admin view of every active project site including its Supervisors -
+    feeds the Project Supervisors assignment UI. Distinct from
+    /attendance/sites, which any authenticated user can read for clock-in."""
+    try:
+        sites = egc_hr_service.list_active_sites()
+    except EGCHRError as e:
+        return jsonify({"error": str(e)}), e.status_code
+    return jsonify({"sites": sites}), 200
+
+
+@bp.route("/projects/<project_id>/supervisors", methods=["PUT"])
+@require_permission("erp.manage_project_supervisors")
+def update_project_supervisors(project_id: str):
+    body = request.get_json(silent=True) or {}
+    employee_ids = body.get("employee_ids")
+    if not isinstance(employee_ids, list):
+        return jsonify({"error": "employee_ids must be a list."}), 400
+
+    try:
+        erp_service._put(f"api/resource/Project/{project_id}", {
+            "custom_egc_supervisors": [{"employee": eid} for eid in employee_ids],
+        })
+    except ERPNextError as e:
+        return jsonify({"error": str(e)}), e.status_code
+
+    invalidate_project_site_cache()
+    return jsonify({"ok": True}), 200
 
 
 @bp.route("/employees/<employee_id>/card", methods=["GET"])
