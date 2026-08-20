@@ -52,6 +52,7 @@ export const Icon = ({ name, size = 16, color = 'currentColor', style = {} }) =>
     idCard:       <><rect x="2" y="5" width="20" height="14" rx="2" {...p}/><circle cx="8" cy="12" r="2" {...p}/><path d="M14 9h4M14 12h4M14 15h2" {...p}/></>,
     passport:     <><rect x="4" y="2" width="16" height="20" rx="2" {...p}/><circle cx="12" cy="10" r="3" {...p}/><path d="M8 17h8M9 14h6" {...p}/></>,
     image:        <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" {...p}/><circle cx="8.5" cy="8.5" r="1.5" {...p}/><polyline points="21 15 16 10 5 21" {...p}/></>,
+    mapPin:       <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" {...p}/><circle cx="12" cy="10" r="3" {...p}/></>,
   }
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, ...style }}>

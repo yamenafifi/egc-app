@@ -85,6 +85,43 @@ export const erpAPI = {
   getEmployee: (id) => api.get(`/erp/employees/${id}`),
   getEmployeeCard: (id) => api.get(`/erp/employees/${id}/card`),
   listProjects: (params) => api.get('/erp/projects', { params }),
+  projectSites: () => api.get('/erp/project-sites'),
+  updateProjectSupervisors: (projectId, employee_ids) =>
+    api.put(`/erp/projects/${projectId}/supervisors`, { employee_ids }),
+}
+
+export const attendanceAPI = {
+  sites: () => api.get('/attendance/sites'),
+  myOpenRecord: () => api.get('/attendance/my-open-record'),
+  clockIn: (payload) => api.post('/attendance/clock-in', payload),
+  clockOut: (payload) => api.post('/attendance/clock-out', payload),
+  myRecords: () => api.get('/attendance/my-records'),
+  createSubmission: (record_ids) => api.post('/attendance/submissions', { record_ids }),
+  teamSubmissions: () => api.get('/attendance/team-submissions'),
+  getSubmission: (id) => api.get(`/attendance/submissions/${id}`),
+  approveSubmission: (id, body) => api.post(`/attendance/submissions/${id}/approve`, body),
+  rejectSubmission: (id, review_note) =>
+    api.post(`/attendance/submissions/${id}/reject`, { review_note }),
+}
+
+export const leaveAPI = {
+  types: () => api.get('/leave/types'),
+  create: (payload) => api.post('/leave/requests', payload),
+  myRequests: () => api.get('/leave/requests'),
+  teamRequests: () => api.get('/leave/requests/team'),
+  get: (id) => api.get(`/leave/requests/${id}`),
+  approve: (id, remarks) => api.post(`/leave/requests/${id}/approve`, { remarks }),
+  reject: (id, remarks) => api.post(`/leave/requests/${id}/reject`, { remarks }),
+}
+
+export const notificationsAPI = {
+  list: (params) => api.get('/notifications', { params }),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
+  vapidPublicKey: () => api.get('/notifications/vapid-public-key'),
+  pushSubscribe: (subscription) => api.post('/notifications/push-subscribe', subscription),
+  pushUnsubscribe: (endpoint) => api.delete('/notifications/push-subscribe', { data: { endpoint } }),
 }
 
 export const templatesAPI = {

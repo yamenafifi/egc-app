@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useLang } from '@/context/LangContext'
+import { useUnreadCount } from '@/hooks/useUnreadCount'
 import { Icon } from '@/components/Icons'
 import { c } from '@/theme'
 import toast from 'react-hot-toast'
@@ -21,6 +22,10 @@ const ROUTE_MAP = {
   '/users': 'Users',
   '/permission-templates': 'Permissions',
   '/system-settings': 'Settings',
+  '/leave/new': 'Request Leave',
+  '/requests': 'Requests',
+  '/notifications': 'Notifications',
+  '/project-supervisors': 'Project Supervisors',
 }
 
 // ── Breadcrumbs (desktop only) ─────────────────────────────────────────────────
@@ -94,7 +99,7 @@ function ProfileMenu({ initials, user, onLogout }) {
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
             color: c.red, fontSize: 13, fontWeight: 600, fontFamily: c.font,
           }}>
-            <Icon name="logOut" size={14} color={c.red} />
+            <Icon name="logout" size={14} color={c.red} />
             Sign Out
           </button>
         </div>
@@ -103,17 +108,42 @@ function ProfileMenu({ initials, user, onLogout }) {
   )
 }
 
+// ── Desktop notification bell ─────────────────────────────────────────────────
+function NotificationBell() {
+  const navigate = useNavigate()
+  const { count } = useUnreadCount()
+  return (
+    <button onClick={() => navigate('/notifications')} style={{
+      position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+      padding: 6, display: 'flex', alignItems: 'center', borderRadius: 99, flexShrink: 0,
+    }}>
+      <Icon name="bell" size={18} color={c.textSub} />
+      {count > 0 && (
+        <span style={{
+          position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, padding: '0 3px',
+          background: c.red, color: '#fff', borderRadius: 99,
+          fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1.5px solid #fff', lineHeight: 1,
+        }}>
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
+  )
+}
+
 // ── Mobile bottom tab bar ──────────────────────────────────────────────────────
-function BottomNav({ tabs, hasAdmin }) {
+function BottomNav({ tabs, hasAdmin, hasPermission }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [adminOpen, setAdminOpen] = useState(false)
 
   const ADMIN_ITEMS = [
-    { to: '/users', label: 'Users', icon: 'users' },
-    { to: '/permission-templates', label: 'Permissions', icon: 'shield' },
-    { to: '/system-settings', label: 'Settings', icon: 'settings' },
-  ]
+    { to: '/users', label: 'Users', icon: 'users', perm: 'users.view_list' },
+    { to: '/permission-templates', label: 'Permissions', icon: 'shield', perm: 'permission_templates.view' },
+    { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
+    { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
+  ].filter(item => hasPermission(item.perm))
 
   return (
     <>
@@ -186,7 +216,7 @@ function BottomNav({ tabs, hasAdmin }) {
             fontFamily: c.font, cursor: 'pointer',
             borderTop: '2px solid transparent',
           }}>
-            <Icon name="grid" size={20} color={c.textMuted} />
+            <Icon name="dashboard" size={20} color={c.textMuted} />
             Admin
           </button>
         )}
@@ -221,7 +251,7 @@ export default function AppLayout() {
   const initials = user?.display_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 
   // ── Admin check
-  const isAdmin = user?.is_sysadmin || hasPermission('users.view_list')
+  const isAdmin = user?.is_sysadmin || hasPermission('users.view_list') || hasPermission('erp.manage_project_supervisors')
 
   // ── Desktop sidebar nav
   const DESKTOP_NAV = [
@@ -232,6 +262,7 @@ export default function AppLayout() {
     { to: '/users', label: 'Users', icon: 'users', perm: 'users.view_list' },
     { to: '/permission-templates', label: 'Permissions', icon: 'shield', perm: 'permission_templates.view' },
     { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
+    { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
   ]
   const visibleDesktop = DESKTOP_NAV.filter(n => !n.perm || hasPermission(n.perm))
 
@@ -260,7 +291,7 @@ export default function AppLayout() {
           </div>
 
           {/* Bottom nav */}
-          <BottomNav tabs={MOBILE_TABS} hasAdmin={isAdmin} />
+          <BottomNav tabs={MOBILE_TABS} hasAdmin={isAdmin} hasPermission={hasPermission} />
         </div>
       </BreadcrumbCtx.Provider>
     )
@@ -334,6 +365,7 @@ export default function AppLayout() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <Breadcrumbs extra={extra} />
             </div>
+            <NotificationBell />
             <ProfileMenu initials={initials} user={user} onLogout={handleLogout} />
           </header>
 
