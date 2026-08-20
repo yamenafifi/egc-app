@@ -1,0 +1,69 @@
+// BottomSheet — slide-up modal for mobile, centered dialog on desktop
+import { useEffect } from 'react'
+import { c } from '@/theme'
+import { Icon } from '@/components/Icons'
+
+export default function BottomSheet({ open, onClose, title, children, maxHeight = '85dvh' }) {
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        backdropFilter: 'blur(2px)',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 560,
+          background: c.surface,
+          borderRadius: '18px 18px 0 0',
+          maxHeight,
+          display: 'flex', flexDirection: 'column',
+          animation: 'slideUp 0.25s ease',
+          boxShadow: '0 -4px 40px rgba(0,0,0,0.12)',
+        }}
+      >
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 99, background: c.border }} />
+        </div>
+
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 20px 12px', borderBottom: `1px solid ${c.border}`,
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: c.text }}>{title}</span>
+          <button onClick={onClose} style={{
+            background: c.bg, border: 'none', borderRadius: 99,
+            width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+            <Icon name="x" size={14} color={c.textMuted} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px 32px' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -7,11 +7,13 @@ import AppLayout from '@/components/layout/AppLayout'
 
 import LoginPage from '@/pages/LoginPage'
 import ChangePasswordPage from '@/pages/ChangePasswordPage'
-import DashboardPage from '@/pages/DashboardPage'
+import InitialPasswordPage from '@/pages/InitialPasswordPage'
+import HomePage from '@/pages/HomePage'
+import ProfilePage from '@/pages/ProfilePage'
 import UsersPage from '@/pages/UsersPage'
-import TimesheetsPage from '@/pages/TimesheetsPage'
 import PermissionTemplatesPage from '@/pages/PermissionTemplatesPage'
 import SystemSettingsPage from '@/pages/SystemSettingsPage'
+import SettingsPage from '@/pages/SettingsPage'
 import EmployeeCardPage from '@/pages/EmployeeCardPage'
 import LegalDocumentsPage from '@/pages/LegalDocumentsPage'
 
@@ -19,22 +21,25 @@ export default function App() {
   return (
     <LangProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Toaster position="top-center" toastOptions={{ duration: 3500, style: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13 } }} />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/change-password" element={<ProtectedRoute><ChangePasswordPage /></ProtectedRoute>} />
+            <Route path="/initial-password" element={<ProtectedRoute><InitialPasswordPage /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="timesheets" element={<ProtectedRoute permission="timesheet.view_own"><TimesheetsPage /></ProtectedRoute>} />
+              <Route index element={<Navigate to="/home" replace />} />
+              <Route path="home" element={<HomePage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="employee-card" element={<EmployeeCardPage />} />
+              <Route path="legal-documents" element={<LegalDocumentsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              {/* Admin routes */}
               <Route path="users" element={<ProtectedRoute permission="users.view_list"><UsersPage /></ProtectedRoute>} />
               <Route path="permission-templates" element={<ProtectedRoute permission="permission_templates.view"><PermissionTemplatesPage /></ProtectedRoute>} />
               <Route path="system-settings" element={<ProtectedRoute permission="system.manage_settings"><SystemSettingsPage /></ProtectedRoute>} />
-              <Route path="employee-card" element={<EmployeeCardPage />} />
-              <Route path="legal-documents" element={<LegalDocumentsPage />} />
             </Route>
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

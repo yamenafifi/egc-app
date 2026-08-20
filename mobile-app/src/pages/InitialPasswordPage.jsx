@@ -7,13 +7,13 @@ import { c } from '@/theme'
 import toast from 'react-hot-toast'
 import { useLang } from '@/context/LangContext'
 
-export default function ChangePasswordPage() {
+export default function InitialPasswordPage() {
   const { fetchMe } = useAuth()
   const { t } = useLang()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ current:'', next:'', confirm:'' })
+  const [form, setForm] = useState({ next:'', confirm:'' })
   const [loading, setLoading] = useState(false)
-  const [showPw, setShowPw] = useState({ current:false, next:false, confirm:false })
+  const [showPw, setShowPw] = useState({ next:false, confirm:false })
 
   const checks = [
     { label:'At least 8 characters', ok: form.next.length >= 8 },
@@ -27,29 +27,25 @@ export default function ChangePasswordPage() {
     if (!checks.every(c => c.ok)) return toast.error('Please meet all password requirements')
     setLoading(true)
     try {
-      await authAPI.changePassword(form.current, form.next)
+      await authAPI.setInitialPassword(form.next)
       await fetchMe()
-      toast.success(t('update_password'))
-      navigate('/dashboard')
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to change password') }
+      toast.success('Password set successfully!')
+      navigate('/home')
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed to set password') }
     finally { setLoading(false) }
   }
 
   const fields = [
-    { key:'current', label:t('current_password'), placeholder:'Enter current password' },
-    { key:'next',    label:t('new_password'),     placeholder:'Min 8 chars, 1 uppercase, 1 number' },
-    { key:'confirm', label:t('confirm_password'), placeholder:'Repeat new password' },
+    { key:'next',    label:t('new_password') || 'New Password',     placeholder:'Min 8 chars, 1 uppercase, 1 number' },
+    { key:'confirm', label:t('confirm_password') || 'Confirm Password', placeholder:'Repeat new password' },
   ]
 
   return (
     <div style={S.page}>
       <div style={S.card}>
-        <button onClick={() => navigate('/profile')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: c.textMuted, fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 24, fontFamily: c.font }}>
-          <Icon name="arrowLeft" size={14} color={c.textMuted} /> Back to Profile
-        </button>
         <div style={S.iconWrap}><Icon name="lock" size={24} color={c.primary} /></div>
-        <h1 style={S.title}>Change Password</h1>
-        <p style={S.sub}>Update your current password below.</p>
+        <h1 style={S.title}>Set New Password</h1>
+        <p style={S.sub}>You must change your password before accessing the portal.</p>
 
         <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {fields.map(({ key, label, placeholder }) => (
@@ -78,7 +74,7 @@ export default function ChangePasswordPage() {
           )}
 
           <button style={{ ...S.btn, opacity:loading?0.75:1 }} disabled={loading}>
-            {loading ? t('signing_in') : t('update_password')}
+            {loading ? 'Saving...' : 'Set Password'}
           </button>
         </form>
       </div>

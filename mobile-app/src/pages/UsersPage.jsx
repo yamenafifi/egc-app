@@ -31,6 +31,9 @@ function UserDetailPage({ userId, onBack, onChanged }) {
   const { setExtra } = useBreadcrumb()
   const [user, setUser] = useState(null)
   const [perms, setPerms] = useState(null)
+  const [localPerms, setLocalPerms] = useState([])
+  const [savingPerms, setSavingPerms] = useState(false)
+  const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPw, setEditingPw] = useState(false)
   const [newPw, setNewPw] = useState('')
@@ -41,18 +44,31 @@ function UserDetailPage({ userId, onBack, onChanged }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [uRes, pRes, tRes] = await Promise.all([
+      const [uRes, pRes, tRes, dRes] = await Promise.all([
         usersAPI.get(userId),
         usersAPI.getPermissions(userId),
         templatesAPI.list(),
+        usersAPI.getDevices(userId).catch(() => ({ data: { devices: [] } })),
       ])
       setUser(uRes.data.user)
       setPerms(pRes.data)
+      setLocalPerms(pRes.data.permissions || [])
       setTemplates(tRes.data.templates || [])
+      setDevices(dRes.data.devices || [])
       setExtra([{ label: uRes.data.user.display_name }])
     } catch { toast.error('Failed to load user') }
     finally { setLoading(false) }
   }, [userId])
+
+  const handleSavePermissions = async () => {
+    setSavingPerms(true)
+    try {
+      await usersAPI.updatePermissions(userId, localPerms)
+      toast.success('Permissions updated')
+      load()
+    } catch (e) { toast.error(e.response?.data?.error || 'Failed to update permissions') }
+    finally { setSavingPerms(false) }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -213,10 +229,39 @@ function UserDetailPage({ userId, onBack, onChanged }) {
           </div>
         )}
 
+        {/* Devices */}
+        {hasPermission('users.view_permissions') && devices && (
+          <div style={{...D.card, gridColumn:'1 / -1'}}>
+            <div style={D.cardTitle}><Icon name="monitor" size={14} color={c.primary}/> Devices & Sessions ({devices.length})</div>
+            {devices.length === 0 ? (
+              <div style={{fontSize:13,color:c.textMuted}}>No devices recorded for this user.</div>
+            ) : (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:8}}>
+                {devices.map(d => (
+                  <div key={d.id} style={{padding:12,border:`1px solid ${c.border}`,borderRadius:8,background:c.surfaceRaised}}>
+                    <div style={{fontSize:13,fontWeight:700,color:c.text,marginBottom:4}}>{d.extra_info?.platform || 'Unknown Device'}</div>
+                    <div style={{fontSize:11,color:c.textMuted}}>IP: {d.last_ip || '—'}</div>
+                    <div style={{fontSize:11,color:c.textMuted}}>Screen: {d.extra_info?.screen || '—'}</div>
+                    <div style={{fontSize:11,color:c.textMuted}}>TZ: {d.extra_info?.timezone || '—'}</div>
+                    <div style={{fontSize:11,color:c.textMuted,marginTop:4,fontWeight:600}}>Last active: {fmtDate(d.last_active)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Permissions */}
         {hasPermission('users.view_permissions') && perms && (
           <div style={{...D.card, gridColumn:'1 / -1'}}>
-            <div style={D.cardTitle}><Icon name="shield" size={14} color={c.primary}/> Permissions ({(user.permissions||[]).length})</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,paddingBottom:10,borderBottom:`1px solid ${c.bg}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:7,fontSize:13,fontWeight:700,color:c.text}}><Icon name="shield" size={14} color={c.primary}/> Custom Permissions ({(localPerms||[]).length})</div>
+              {hasPermission('users.edit_permissions') && !user.is_sysadmin && (
+                <button style={{...D.primaryBtn,padding:'6px 12px',fontSize:12}} onClick={handleSavePermissions} disabled={savingPerms}>
+                  {savingPerms ? 'Saving…' : 'Save Permissions'}
+                </button>
+              )}
+            </div>
             {user.is_sysadmin ? (
               <div style={{fontSize:13,color:c.green,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
                 <Icon name="checkCircle" size={14} color={c.green}/> System administrator — has all permissions
@@ -224,13 +269,21 @@ function UserDetailPage({ userId, onBack, onChanged }) {
             ) : (
               <div style={D.permGrid}>
                 {Object.entries(perms.all_nodes||{}).map(([node, desc]) => {
-                  const has = (user.permissions||[]).includes(node)
+                  const has = localPerms.includes(node)
+                  const canEdit = hasPermission('users.edit_permissions')
                   return (
-                    <div key={node} style={{...D.permRow,...(has?D.permRowOn:{})}}>
-                      <Icon name={has?'checkCircle':'xCircle'} size={12} color={has?c.green:c.borderStrong}/>
+                    <div key={node} 
+                         style={{...D.permRow,...(has?D.permRowOn:{}),cursor:canEdit?'pointer':'default'}}
+                         onClick={() => {
+                           if (!canEdit) return
+                           setLocalPerms(prev => has ? prev.filter(p => p !== node) : [...prev, node])
+                         }}>
+                      <div style={{width:16,height:16,borderRadius:4,border:`1.5px solid ${has?c.green:c.borderStrong}`,background:has?c.green:c.surfaceRaised,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:2}}>
+                        {has && <Icon name="check" size={12} color="#fff"/>}
+                      </div>
                       <div>
-                        <div style={{fontSize:11,fontWeight:600,color:has?c.text:c.textMuted,fontFamily:c.mono}}>{node}</div>
-                        <div style={{fontSize:10,color:c.textMuted}}>{desc}</div>
+                        <div style={{fontSize:12,fontWeight:600,color:has?c.text:c.textMuted,fontFamily:c.mono}}>{node}</div>
+                        <div style={{fontSize:11,color:c.textMuted,lineHeight:1.4}}>{desc}</div>
                       </div>
                     </div>
                   )

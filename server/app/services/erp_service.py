@@ -76,9 +76,9 @@ class ERPNextService:
         search = (search or "").strip() or None
 
         if search:
-            filters = '[["employee_name", "like", "%' + search + '%"], ["status", "=", "Active"]]'
+            filters = '[["employee_name", "like", "%' + search + '%"], ["status", "=", "Active"], ["custom_egc_portal", "=", 0]]'
         else:
-            filters = '[["status", "=", "Active"]]'
+            filters = '[["status", "=", "Active"], ["custom_egc_portal", "=", 0]]'
 
         params = {
             "fields": json.dumps(fields),
@@ -206,6 +206,32 @@ class ERPNextService:
             return True
         except ERPNextError:
             return False
+
+    def get_designation(self, designation_name: str) -> dict:
+        """
+        Fetch a Designation doctype record.
+        Returns the data dict, or {} on any error.
+        Useful for retrieving custom_english_designation.
+        """
+        if not designation_name:
+            return {}
+        try:
+            return self._get(f"api/resource/Designation/{designation_name}").get("data", {})
+        except ERPNextError:
+            return {}
+
+    def get_department(self, department_name: str) -> dict:
+        """
+        Fetch a Department doctype record.
+        Returns the data dict, or {} on any error.
+        Useful for retrieving custom_arabic_department_name.
+        """
+        if not department_name:
+            return {}
+        try:
+            return self._get(f"api/resource/Department/{department_name}").get("data", {})
+        except ERPNextError:
+            return {}
 
     # ── Projects ──────────────────────────────────────────────────────────────
 

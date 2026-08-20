@@ -22,11 +22,11 @@ class Config:
         days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", 30))
     )
 
-    # ERPNext
+    # ERP
     ERP_BASE_URL = os.getenv("ERP_BASE_URL", "https://erp.egc-me.com")
     ERP_API_KEY = os.getenv("ERP_API_KEY", "88446f9afed2123")
     ERP_API_SECRET = os.getenv("ERP_API_SECRET", "d9ca412fab34da6")
 
     # System Admin bootstrap
-    SYSADMIN_USERNAME = os.getenv("SYSADMIN_USERNAME", "sysadmin")
+    SYSADMIN_USERNAME = os.getenv("SYSADMIN_USERNAME", "Administrator")
     SYSADMIN_PASSWORD = os.getenv("SYSADMIN_PASSWORD", "Admin@123!")

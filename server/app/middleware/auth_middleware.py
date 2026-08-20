@@ -29,6 +29,17 @@ def jwt_required_custom(fn):
         except Exception as e:
             return jsonify({"error": "Authentication required.", "detail": str(e)}), 401
 
+        from flask_jwt_extended import get_jwt
+        claims = get_jwt()
+        device_id = claims.get("device_id")
+
+        db = get_db()
+        if device_id:
+            from app.models.user_device import UserDeviceModel
+            device = db[UserDeviceModel.COLLECTION].find_one({"_id": ObjectId(device_id)})
+            if not device:
+                return jsonify({"error": "Session revoked. Please log in again."}), 401
+
         user = _load_current_user()
         if not user:
             return jsonify({"error": "User account not found."}), 401

@@ -56,7 +56,7 @@ class AuthService:
 
     # ── Login ────────────────────────────────────────────────────────────────
 
-    def login(self, username: str, password: str, ip: str = None) -> dict:
+    def login(self, username: str, password: str, ip: str = None, user_agent_str: str = None, device_info: dict = None) -> tuple[dict, str]:
         db = get_db()
 
         user = db[UserModel.COLLECTION].find_one({"username": username})
@@ -98,7 +98,66 @@ class AuthService:
 
         self._audit("auth.login", user=user, ip=ip)
 
-        return UserModel.to_public(user)
+        from app.models.user_device import UserDeviceModel
+
+        device_name = "Unknown Device"
+        if user_agent_str:
+            ua = user_agent_str.lower()
+            os = "Unknown OS"
+            if "windows" in ua: os = "Windows"
+            elif "mac os x" in ua: os = "Mac OS"
+            elif "android" in ua: os = "Android"
+            elif "iphone" in ua or "ipad" in ua: os = "iOS"
+            elif "linux" in ua: os = "Linux"
+
+            browser = "Unknown Browser"
+            if "edg/" in ua or "edge/" in ua: browser = "Edge"
+            elif "chrome/" in ua and "safari/" in ua: browser = "Chrome"
+            elif "safari/" in ua and "chrome/" not in ua: browser = "Safari"
+            elif "firefox/" in ua: browser = "Firefox"
+            elif "opr/" in ua or "opera/" in ua: browser = "Opera"
+            
+            device_name = f"{os} - {browser}"
+
+        extra_info = device_info or {}
+        device_uuid = extra_info.get("device_uuid")
+
+        if device_uuid:
+            # Try to find an existing device for this user
+            existing_device = db[UserDeviceModel.COLLECTION].find_one({
+                "user_id": str(user["_id"]),
+                "device_uuid": device_uuid
+            })
+            if existing_device:
+                # Update existing device session
+                db[UserDeviceModel.COLLECTION].update_one(
+                    {"_id": existing_device["_id"]},
+                    {"$set": {
+                        "last_active": datetime.now(timezone.utc),
+                        "ip_address": ip or "",
+                        "device_name": device_name,
+                        "extra_info": extra_info
+                    }}
+                )
+                device_id = str(existing_device["_id"])
+                return UserModel.to_public(user), device_id
+
+        # If no device_uuid provided or no existing record found, create a new one
+        import uuid
+        if not device_uuid:
+            device_uuid = str(uuid.uuid4())
+
+        device_doc = UserDeviceModel.new(
+            user_id=str(user["_id"]),
+            device_uuid=device_uuid,
+            device_name=device_name,
+            ip_address=ip or "",
+            extra_info=extra_info,
+        )
+        res = db[UserDeviceModel.COLLECTION].insert_one(device_doc)
+        device_id = str(res.inserted_id)
+
+        return UserModel.to_public(user), device_id
 
     # ── Account creation ─────────────────────────────────────────────────────
 
@@ -127,11 +186,23 @@ class AuthService:
         if existing:
             raise AuthError(f"An account for IQAMA {iqama} already exists.", 409)
 
+        # Fetch bilingual designation and department details
+        designation_name = employee.get("designation", "")
+        department_name  = employee.get("department", "")
+
+        designation_doc = erp_service.get_designation(designation_name)
+        department_doc  = erp_service.get_department(department_name)
+
         # Create user document
         user_doc = UserModel.new(
             username=iqama,
             password_hash=self.hash_password(initial_password),
             display_name=employee.get("employee_name", iqama),
+            en_display_name=employee.get("custom_arabic_full_name") or None,
+            department=department_name or None,
+            department_ar=department_doc.get("custom_arabic_department_name") or None,
+            designation=designation_name or None,
+            designation_en=designation_doc.get("custom_english_designation") or None,
             iqama_number=iqama,
             erp_employee_id=erp_employee_id,
             created_by=str(created_by_user["_id"]),
@@ -159,6 +230,45 @@ class AuthService:
         return UserModel.to_public(user_doc)
 
     # ── Password management ───────────────────────────────────────────────────
+
+    def admin_reset_password(self, target_user_id: str, new_password: str, admin_user: dict) -> None:
+        db = get_db()
+        target = db[UserModel.COLLECTION].find_one({"_id": ObjectId(target_user_id)})
+        if not target:
+            raise AuthError("User not found.", 404)
+
+        if target.get("is_sysadmin"):
+            raise AuthError("Cannot reset system administrator password from here.", 403)
+
+        self._audit("auth.admin_reset_pw", user=admin_user, detail={"target_user": target["username"]})
+
+        db[UserModel.COLLECTION].update_one(
+            {"_id": target["_id"]},
+            {"$set": {
+                "password_hash": self.hash_password(new_password),
+                "must_change_password": True,
+            }}
+        )
+
+    def set_initial_password(self, user_id: str, new_password: str, ip: str = None) -> None:
+        db = get_db()
+        user = db[UserModel.COLLECTION].find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise AuthError("User not found.", 404)
+
+        if not user.get("must_change_password"):
+            raise AuthError("Initial password already set. Use the standard change password flow.", 400)
+
+        self._audit("auth.set_initial_pw", user=user, ip=ip)
+
+        db[UserModel.COLLECTION].update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "password_hash": self.hash_password(new_password),
+                "must_change_password": False,
+                "updated_at": datetime.now(timezone.utc),
+            }}
+        )
 
     def change_password(self, user_id: str, current_password: str, new_password: str, ip: str = None) -> None:
         db = get_db()
@@ -288,18 +398,30 @@ class AuthService:
             return None  # Signal to caller that the user no longer exists
 
         # ── Employee exists — sync all fields ─────────────────────────────────────
-        erp_status = emp.get("status", "Active")
-        erp_name   = emp.get("employee_name", "").strip() or user.get("display_name")
-        erp_iqama  = emp.get("custom_iqamaid_number", "").strip() or user.get("iqama_number", "")
-        erp_is_active = erp_status == "Active"
+        erp_status       = emp.get("status", "Active")
+        erp_name         = emp.get("employee_name", "").strip() or user.get("display_name")
+        erp_iqama        = emp.get("custom_iqamaid_number", "").strip() or user.get("iqama_number", "")
+        erp_is_active    = erp_status == "Active"
         portal_is_active = user.get("is_active", True)
 
+        # Fetch bilingual designation / department (best-effort; falls back to stored values)
+        designation_name = emp.get("designation", "") or user.get("designation", "")
+        department_name  = emp.get("department", "")  or user.get("department", "")
+
+        designation_doc = erp_service.get_designation(designation_name)
+        department_doc  = erp_service.get_department(department_name)
+
         updates = {
-            "display_name": erp_name,
-            "iqama_number": erp_iqama,
-            "erp_linked":   True,
-            "updated_at":   now,
-            "erp_photo_url": _build_erp_url(emp.get("image")),
+            "display_name":    erp_name,
+            "en_display_name": emp.get("custom_arabic_full_name") or user.get("en_display_name"),
+            "department":      department_name or None,
+            "department_ar":   department_doc.get("custom_arabic_department_name") or user.get("department_ar"),
+            "designation":     designation_name or None,
+            "designation_en":  designation_doc.get("custom_english_designation") or user.get("designation_en"),
+            "iqama_number":    erp_iqama,
+            "erp_linked":      True,
+            "updated_at":      now,
+            "erp_photo_url":   _build_erp_url(emp.get("image")),
         }
 
         # Sync iqama → username if it changed and there's no collision
@@ -447,5 +569,20 @@ class AuthService:
             ip=ip,
         )
         db[AuditLogModel.COLLECTION].insert_one(log)
+
+    # ── Devices ───────────────────────────────────────────────────────────────
+
+    def get_user_devices(self, user_id: str) -> list[dict]:
+        db = get_db()
+        from app.models.user_device import UserDeviceModel
+        devices = db[UserDeviceModel.COLLECTION].find({"user_id": user_id}).sort("last_active", -1)
+        return [UserDeviceModel.to_public(d) for d in devices]
+
+    def revoke_device(self, user_id: str, device_id: str) -> None:
+        db = get_db()
+        from app.models.user_device import UserDeviceModel
+        res = db[UserDeviceModel.COLLECTION].delete_one({"_id": ObjectId(device_id), "user_id": user_id})
+        if res.deleted_count == 0:
+            raise AuthError("Device not found or not owned by you.", 404)
 
 auth_service = AuthService()

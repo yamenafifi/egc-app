@@ -15,7 +15,7 @@ export default function ProtectedRoute({ children, permission }) {
   )
 
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
-  if (user.must_change_password && location.pathname !== '/change-password') return <Navigate to="/change-password" replace />
+  if (user.must_change_password && location.pathname !== '/initial-password') return <Navigate to="/initial-password" replace />
 
   if (permission && !user.is_sysadmin && !user.permissions?.includes(permission)) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'50vh', gap:12, padding:24 }}>

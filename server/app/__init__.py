@@ -9,7 +9,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
 from config.settings import Config
-from app.utils.database import get_db, init_indexes, init_timesheet_indexes
+from app.utils.database import get_db, init_indexes
 from app.services.auth_service import auth_service
 
 
@@ -26,7 +26,6 @@ def create_app() -> Flask:
 
     db = get_db()
     init_indexes(db)
-    init_timesheet_indexes(db)
 
     auth_service.ensure_sysadmin(
         username=Config.SYSADMIN_USERNAME,
@@ -37,14 +36,12 @@ def create_app() -> Flask:
     from app.api.users import bp as users_bp
     from app.api.erp import bp as erp_bp
     from app.api.permission_templates import bp as templates_bp
-    from app.api.timesheets import bp as timesheets_bp
     from app.api.settings import bp as settings_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(erp_bp)
     app.register_blueprint(templates_bp)
-    app.register_blueprint(timesheets_bp)
     app.register_blueprint(settings_bp)
 
     @app.route("/api/health")

@@ -10,7 +10,12 @@ class UserModel:
     _id                 : ObjectId (auto)
     username            : str  — login handle (typically iqama number)
     password_hash       : str  — bcrypt hash
-    display_name        : str  — full name from ERP
+    display_name        : str  — Arabic full name from ERP (employee_name)
+    en_display_name     : str  — English full name from ERP (custom_arabic_full_name)
+    department          : str  — Department name (ERP link key, e.g. "Accounting")
+    department_ar       : str  — Arabic department name (custom_arabic_department_name)
+    designation         : str  — Designation name (ERP link key)
+    designation_en      : str  — English designation (custom_english_designation)
     is_sysadmin         : bool — built-in super-admin flag (cannot be toggled)
     is_active           : bool — account enabled/disabled
     must_change_password: bool — forces password change on next login
@@ -32,6 +37,11 @@ class UserModel:
         username: str,
         password_hash: str,
         display_name: str,
+        en_display_name: str = None,
+        department: str = None,
+        department_ar: str = None,
+        designation: str = None,
+        designation_en: str = None,
         iqama_number: str = None,
         erp_employee_id: str = None,
         created_by: str = None,
@@ -42,6 +52,11 @@ class UserModel:
             "username": username,
             "password_hash": password_hash,
             "display_name": display_name,
+            "en_display_name": en_display_name,
+            "department": department,
+            "department_ar": department_ar,
+            "designation": designation,
+            "designation_en": designation_en,
             "is_sysadmin": is_sysadmin,
             "is_active": True,
             "must_change_password": not is_sysadmin,  # sysadmin seed skips this
@@ -63,6 +78,11 @@ class UserModel:
             "id": str(user["_id"]),
             "username": user["username"],
             "display_name": user["display_name"],
+            "en_display_name": user.get("en_display_name"),
+            "department": user.get("department"),
+            "department_ar": user.get("department_ar"),
+            "designation": user.get("designation"),
+            "designation_en": user.get("designation_en"),
             "is_sysadmin": user.get("is_sysadmin", False),
             "is_active": user.get("is_active", True),
             "must_change_password": user.get("must_change_password", False),

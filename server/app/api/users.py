@@ -249,3 +249,18 @@ def bulk_sync_from_erp():
         "updated":     updated,
         "deactivated": deactivated,
     }), 200
+
+@bp.route("/<user_id>/devices", methods=["GET"])
+@require_permission("users.view_permissions")
+def get_user_devices(user_id: str):
+    db = get_db()
+    try:
+        user = db[UserModel.COLLECTION].find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        return jsonify({"error": "Invalid user ID."}), 400
+
+    if not user:
+        return jsonify({"error": "User not found."}), 404
+
+    devices = auth_service.get_user_devices(user_id)
+    return jsonify({"devices": devices}), 200

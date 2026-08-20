@@ -12,42 +12,36 @@ const SIDEBAR_KEY = 'egc_sidebar_collapsed'
 const BreadcrumbCtx = createContext({ extra: [], setExtra: () => {} })
 export const useBreadcrumb = () => useContext(BreadcrumbCtx)
 
-// Static route → label map (keys must match exactly)
+// ── Route label map ────────────────────────────────────────────────────────────
 const ROUTE_MAP = {
-  '/dashboard':            'nav_home',
-  '/timesheets':           'nav_timesheets',
-  '/users':                'nav_users',
-  '/permission-templates': 'nav_permissions',
-  '/system-settings':      'nav_settings',
+  '/home': 'Home',
+  '/profile': 'Profile',
+  '/employee-card': 'Employee Card',
+  '/legal-documents': 'Documents',
+  '/users': 'Users',
+  '/permission-templates': 'Permissions',
+  '/system-settings': 'Settings',
 }
 
+// ── Breadcrumbs (desktop only) ─────────────────────────────────────────────────
 function Breadcrumbs({ extra }) {
   const location = useLocation()
-  const { t, isRTL } = useLang()
-
-  // Find current section label
   const routeKey = Object.keys(ROUTE_MAP).find(
     k => location.pathname === k || location.pathname.startsWith(k + '/')
   )
-  const sectionLabel = routeKey ? t(ROUTE_MAP[routeKey]) : null
-
+  const sectionLabel = routeKey ? ROUTE_MAP[routeKey] : null
   const crumbs = [
-    { label: t('appName'), to: '/dashboard', clickable: true },
+    { label: 'EGC App', to: '/home', clickable: true },
     ...(sectionLabel ? [{ label: sectionLabel, to: routeKey, clickable: !!(extra && extra.length > 0) }] : []),
-    ...(extra || []).map((e, i) => ({ label: e.label, to: e.to, clickable: i < (extra.length - 1) })),
+    ...(extra || []).map((e, i) => ({ label: e.label, to: e.to, clickable: i < extra.length - 1 })),
   ]
-
-  const Sep = () => (
-    <Icon name={isRTL ? 'chevronLeft' : 'chevronRight'} size={11} color={c.textMuted} style={{ flexShrink: 0 }} />
-  )
-
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', minWidth: 0 }}>
       {crumbs.map((crumb, i) => (
         <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-          {i > 0 && <Sep />}
+          {i > 0 && <Icon name="chevronRight" size={11} color={c.textMuted} style={{ flexShrink: 0 }} />}
           {crumb.clickable && crumb.to ? (
-            <Link to={crumb.to} style={{ fontSize: 12, color: c.textMuted, textDecoration: 'none', fontWeight: 500, whiteSpace: 'nowrap' }}>
+            <Link to={crumb.to} style={{ fontSize: 12, color: c.textMuted, textDecoration: 'none', fontWeight: 500 }}>
               {crumb.label}
             </Link>
           ) : (
@@ -61,9 +55,8 @@ function Breadcrumbs({ extra }) {
   )
 }
 
-// ── Profile popup ──────────────────────────────────────────────────────────────
+// ── Desktop profile dropdown ───────────────────────────────────────────────────
 function ProfileMenu({ initials, user, onLogout }) {
-  const { lang, switchLang, languages, t, isRTL } = useLang()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -77,71 +70,137 @@ function ProfileMenu({ initials, user, onLogout }) {
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button onClick={() => setOpen(p => !p)} style={{
         width: 34, height: 34, borderRadius: '50%',
-        background: user?.erp_photo_url ? 'transparent' : c.primary,
-        color: '#fff',
-        border: `2px solid ${open ? c.primaryDark : 'transparent'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: c.font,
-        overflow: 'hidden', padding: 0,
+        background: c.primaryBg, border: `2px solid ${c.primaryBorder}`,
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 12, fontWeight: 700, color: c.primary, overflow: 'hidden', padding: 0,
       }}>
         {user?.erp_photo_url
-          ? <img src={user.erp_photo_url} alt={initials} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML = initials }} />
+          ? <img src={user.erp_photo_url} alt={initials} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = initials }} />
           : initials
         }
       </button>
-
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', [isRTL ? 'left' : 'right']: 0,
-          background: c.surface, border: `1px solid ${c.border}`,
-          borderRadius: 12, boxShadow: c.lg, zIndex: 300, minWidth: 220, overflow: 'hidden',
+          position: 'absolute', top: 42, right: 0, minWidth: 200,
+          background: c.surface, borderRadius: 12, border: `1px solid ${c.border}`,
+          boxShadow: c.lg, zIndex: 100, overflow: 'hidden',
         }}>
-          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${c.border}`, background: c.bg }}>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${c.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>{user?.display_name}</div>
-            <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{user?.is_sysadmin ? 'System Administrator' : 'Employee'}</div>
+            <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{user?.username}</div>
           </div>
-          <div style={{ padding: '8px 8px 4px' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.7px', padding: '4px 8px 6px' }}>Language</div>
-            {languages.map(l => (
-              <button key={l.code} onClick={() => switchLang(l.code)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px',
-                borderRadius: 7, background: lang === l.code ? c.primaryBg : 'none', border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: lang === l.code ? 700 : 500,
-                color: lang === l.code ? c.primary : c.text, fontFamily: c.font,
-              }}>
-                <span style={{ fontSize: 16 }}>{l.flag}</span>
-                <span style={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{l.nativeLabel}</span>
-                {lang === l.code && <Icon name="check" size={12} color={c.primary} />}
-              </button>
-            ))}
-          </div>
-          <div style={{ padding: '4px 8px 8px', borderTop: `1px solid ${c.border}`, marginTop: 4 }}>
-            <button onClick={() => { setOpen(false); onLogout() }} style={{
-              display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 10px',
-              borderRadius: 7, background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: 600, color: c.red, fontFamily: c.font,
-            }}>
-              <Icon name="logout" size={15} color={c.red} />
-              {t('nav_signout')}
-            </button>
-          </div>
+          <button onClick={onLogout} style={{
+            width: '100%', padding: '11px 16px', background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+            color: c.red, fontSize: 13, fontWeight: 600, fontFamily: c.font,
+          }}>
+            <Icon name="logOut" size={14} color={c.red} />
+            Sign Out
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-// ── Main layout ────────────────────────────────────────────────────────────────
+// ── Mobile bottom tab bar ──────────────────────────────────────────────────────
+function BottomNav({ tabs, hasAdmin }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [adminOpen, setAdminOpen] = useState(false)
+
+  const ADMIN_ITEMS = [
+    { to: '/users', label: 'Users', icon: 'users' },
+    { to: '/permission-templates', label: 'Permissions', icon: 'shield' },
+    { to: '/system-settings', label: 'Settings', icon: 'settings' },
+  ]
+
+  return (
+    <>
+      {/* Admin Sheet */}
+      {adminOpen && (
+        <div onClick={() => setAdminOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 150, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'flex-end',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', background: c.surface,
+            borderRadius: '18px 18px 0 0',
+            padding: '12px 0 32px',
+            animation: 'slideUp 0.22s ease',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 99, background: c.border }} />
+            </div>
+            <div style={{ padding: '0 16px', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px' }}>Admin</span>
+            </div>
+            {ADMIN_ITEMS.map(item => (
+              <button key={item.to} onClick={() => { navigate(item.to); setAdminOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, width: '100%',
+                  padding: '14px 20px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontFamily: c.font, fontSize: 14, fontWeight: 500, color: c.text,
+                }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={item.icon} size={17} color={c.textSub} />
+                </div>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <nav style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+        background: c.surface,
+        borderTop: `1px solid ${c.border}`,
+        display: 'flex', alignItems: 'stretch',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        boxShadow: '0 -1px 0 rgba(0,0,0,0.06)',
+      }}>
+        {tabs.map(tab => {
+          const active = location.pathname === tab.to
+          return (
+            <NavLink key={tab.to} to={tab.to} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', gap: 3, padding: '9px 4px',
+              textDecoration: 'none', color: active ? c.primary : c.textMuted,
+              fontSize: 10, fontWeight: active ? 700 : 500,
+              fontFamily: c.font, transition: 'color 0.15s',
+              borderTop: active ? `2px solid ${c.primary}` : '2px solid transparent',
+            }}>
+              <Icon name={tab.icon} size={20} color={active ? c.primary : c.textMuted} />
+              {tab.label}
+            </NavLink>
+          )
+        })}
+        {hasAdmin && (
+          <button onClick={() => setAdminOpen(p => !p)} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 3, padding: '9px 4px',
+            background: 'none', border: 'none',
+            color: c.textMuted, fontSize: 10, fontWeight: 500,
+            fontFamily: c.font, cursor: 'pointer',
+            borderTop: '2px solid transparent',
+          }}>
+            <Icon name="grid" size={20} color={c.textMuted} />
+            Admin
+          </button>
+        )}
+      </nav>
+    </>
+  )
+}
+
+// ── Main Layout ────────────────────────────────────────────────────────────────
 export default function AppLayout() {
   const { user, logout, hasPermission } = useAuth()
-  const { t, isRTL } = useLang()
   const navigate = useNavigate()
-  const location = useLocation()
   const [extra, setExtra] = useState([])
-
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_KEY) === 'true' } catch { return false }
-  })
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true')
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   useEffect(() => {
@@ -150,119 +209,142 @@ export default function AppLayout() {
     return () => window.removeEventListener('resize', h)
   }, [])
 
-  // Clear extra crumbs when route changes
-  useEffect(() => { setExtra([]) }, [location.pathname])
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_KEY, collapsed)
+  }, [collapsed])
 
-  const toggleCollapse = () => setCollapsed(p => { const n = !p; localStorage.setItem(SIDEBAR_KEY, String(n)); return n })
-  const handleLogout = async () => { await logout(); navigate('/login') }
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
-  const NAV = [
-    { to: '/dashboard',            label: t('nav_home'),        icon: 'home',     perm: null },
-    { to: '/timesheets',           label: t('nav_timesheets'),  icon: 'clock',    perm: 'timesheet.view_own' },
-    { to: '/employee-card',        label: 'Employee Card',      icon: 'idCard',   perm: null },
-    { to: '/legal-documents',      label: 'Documents',          icon: 'passport', perm: null },
-    { to: '/users',                label: t('nav_users'),       icon: 'users',    perm: 'users.view_list' },
-    { to: '/permission-templates', label: t('nav_permissions'), icon: 'shield',   perm: 'permission_templates.view' },
-    { to: '/system-settings',      label: t('nav_settings'),    icon: 'settings', perm: 'system.manage_settings' },
-  ]
-  const visible = NAV.filter(n => !n.perm || hasPermission(n.perm))
   const initials = user?.display_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 
-  // ── Mobile ──────────────────────────────────────────────────────────────────
+  // ── Admin check
+  const isAdmin = user?.is_sysadmin || hasPermission('users.view_list')
+
+  // ── Desktop sidebar nav
+  const DESKTOP_NAV = [
+    { to: '/home', label: 'Home', icon: 'home', perm: null },
+    { to: '/employee-card', label: 'Employee Card', icon: 'idCard', perm: null },
+    { to: '/legal-documents', label: 'Documents', icon: 'passport', perm: null },
+    { to: '/profile', label: 'Profile', icon: 'user', perm: null },
+    { to: '/users', label: 'Users', icon: 'users', perm: 'users.view_list' },
+    { to: '/permission-templates', label: 'Permissions', icon: 'shield', perm: 'permission_templates.view' },
+    { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
+  ]
+  const visibleDesktop = DESKTOP_NAV.filter(n => !n.perm || hasPermission(n.perm))
+
+  // ── Mobile bottom tabs (always-visible ones)
+  const MOBILE_TABS = [
+    { to: '/home', label: 'Home', icon: 'home' },
+    { to: '/legal-documents', label: 'Documents', icon: 'fileText' },
+    { to: '/employee-card', label: 'Card', icon: 'idCard' },
+    { to: '/profile', label: 'Profile', icon: 'user' },
+  ]
+
+  // ── Mobile layout
   if (isMobile) {
     return (
       <BreadcrumbCtx.Provider value={{ extra, setExtra }}>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: c.bg, direction: isRTL ? 'rtl' : 'ltr' }}>
-          <div style={M.topbar}>
-            <img src="/logo.png" alt="" style={M.logoImg} onError={e => e.target.style.display = 'none'} />
-            <div style={{ flex: 1, minWidth: 0 }}><Breadcrumbs extra={extra} /></div>
-            <ProfileMenu initials={initials} user={user} onLogout={handleLogout} />
+        <style>{`
+          @keyframes mobilePageSlide {
+            0% { transform: translateX(20px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+          }
+        `}</style>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: c.bg, fontFamily: c.font }}>
+          {/* Content */}
+          <div key={location.pathname} style={{ flex: 1, overflowY: 'auto', paddingBottom: 68, animation: 'mobilePageSlide 0.2s ease-out forwards' }}>
+            <Outlet />
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 72px' }}><Outlet /></div>
-          <nav style={M.bottomNav}>
-            {visible.slice(0, 5).map(item => {
-              const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-              return (
-                <NavLink key={item.to} to={item.to} style={{ ...M.bottomNavItem, textDecoration: 'none' }}>
-                  <Icon name={item.icon} size={20} color={active ? c.primary : '#6B7280'} />
-                  <span style={{ fontSize: 9, color: active ? c.primary : '#6B7280', fontWeight: active ? 700 : 500, fontFamily: c.font, marginTop: 2 }}>{item.label}</span>
-                </NavLink>
-              )
-            })}
-          </nav>
+
+          {/* Bottom nav */}
+          <BottomNav tabs={MOBILE_TABS} hasAdmin={isAdmin} />
         </div>
       </BreadcrumbCtx.Provider>
     )
   }
 
-  // ── Desktop ──────────────────────────────────────────────────────────────────
-  const sideW = collapsed ? 56 : 232
+  // ── Desktop layout (sidebar)
+  const sw = collapsed ? 64 : 220
 
   return (
     <BreadcrumbCtx.Provider value={{ extra, setExtra }}>
-      <div style={{ display: 'flex', minHeight: '100vh', background: c.bg, direction: isRTL ? 'rtl' : 'ltr' }}>
+      <div style={{ display: 'flex', height: '100dvh', fontFamily: c.font, background: c.bg }}>
 
         {/* Sidebar */}
-        <aside style={{ width: sideW, transition: 'width 0.22s ease', background: '#F7F8FA', display: 'flex', flexDirection: 'column', height: '100vh', position: 'sticky', top: 0, flexShrink: 0, borderRight: '1px solid #E2E8F0' }}>
+        <aside style={{
+          width: sw, flexShrink: 0, background: c.sidebar,
+          borderRight: `1px solid ${c.sidebarBorder}`,
+          display: 'flex', flexDirection: 'column',
+          transition: 'width 0.2s ease', overflow: 'hidden',
+        }}>
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '16px 0' : '14px', borderBottom: '1px solid #E2E8F0', minHeight: 56, justifyContent: collapsed ? 'center' : 'flex-start' }}>
-            <img src="/logo.png" alt="EGC" style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'contain', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-            {!collapsed && (
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: c.text, whiteSpace: 'nowrap' }}>{t('appName')}</div>
-                <div style={{ fontSize: 9, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.7px', marginTop: 1 }}>{t('appSub')}</div>
-              </div>
-            )}
+          <div style={{
+            height: 56, display: 'flex', alignItems: 'center',
+            padding: collapsed ? '0 14px' : '0 16px',
+            borderBottom: `1px solid ${c.sidebarBorder}`,
+            gap: 12, flexShrink: 0,
+          }}>
+            <img src="/logo.png" alt="EGC" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+            {!collapsed && <span style={{ fontSize: 16, fontWeight: 800, color: c.text, whiteSpace: 'nowrap' }}>EGC App</span>}
           </div>
 
-          {/* Nav */}
-          <nav style={{ flex: 1, padding: '8px', overflowY: 'auto' }}>
-            {!collapsed && <div style={{ fontSize: 9, fontWeight: 700, color: '#9CA3AF', letterSpacing: '1px', padding: '6px 8px 4px', textTransform: 'uppercase' }}>MENU</div>}
-            {visible.map(item => (
-              <NavLink key={item.to} to={item.to} title={collapsed ? item.label : undefined} style={{ textDecoration: 'none', display: 'block' }}>
-                {({ isActive }) => (
-                  <div style={{
-                    display: 'flex', alignItems: 'center',
-                    color: isActive ? c.primary : '#374151',
-                    background: isActive ? c.primaryBg : 'transparent',
-                    borderLeft: isActive ? `3px solid ${c.primary}` : '3px solid transparent',
-                    borderRadius: isActive ? '0 8px 8px 0' : 8,
-                    marginBottom: 2, padding: collapsed ? '10px 0' : '9px 10px',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
-                    fontWeight: isActive ? 700 : 400, transition: 'all 0.12s',
-                  }}>
-                    <Icon name={item.icon} size={17} color={isActive ? c.primary : '#374151'} />
-                    {!collapsed && <span style={{ marginLeft: isRTL ? 0 : 9, marginRight: isRTL ? 9 : 0, fontSize: 13 }}>{item.label}</span>}
-                  </div>
-                )}
+          {/* Nav items */}
+          <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+            {visibleDesktop.map(item => (
+              <NavLink key={item.to} to={item.to} style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: collapsed ? '10px 12px' : '9px 12px',
+                borderRadius: 9, marginBottom: 2,
+                textDecoration: 'none', fontWeight: isActive ? 700 : 500,
+                fontSize: 13, color: isActive ? c.sidebarActive : c.sidebarText,
+                background: isActive ? c.sidebarActiveBg : 'transparent',
+                transition: 'background 0.12s, color 0.12s',
+                whiteSpace: 'nowrap', overflow: 'hidden',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+              })}>
+                <Icon name={item.icon} size={17} color="currentColor" style={{ flexShrink: 0 }} />
+                {!collapsed && item.label}
               </NavLink>
             ))}
           </nav>
 
-          {/* Collapse btn */}
-          <div style={{ padding: collapsed ? '10px 0' : '10px 8px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end' }}>
-            <button onClick={toggleCollapse} style={{ width: 28, height: 28, borderRadius: 6, background: c.bg, border: `1px solid ${c.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={13} color="#374151" />
-            </button>
-          </div>
+          {/* Collapse toggle */}
+          <button onClick={() => setCollapsed(p => !p)} style={{
+            margin: '8px', padding: '10px',
+            background: 'none', border: `1px solid ${c.sidebarBorder}`,
+            borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', color: c.sidebarMuted, flexShrink: 0,
+          }}>
+            <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={14} color={c.sidebarMuted} />
+          </button>
         </aside>
 
-        {/* Main */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ height: 52, background: c.surface, borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', position: 'sticky', top: 0, zIndex: 10, boxShadow: c.sm }}>
-            <Breadcrumbs extra={extra} />
+        {/* Main content area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Topbar */}
+          <header style={{
+            height: 56, background: c.surface,
+            borderBottom: `1px solid ${c.border}`,
+            display: 'flex', alignItems: 'center',
+            padding: '0 24px', gap: 16, flexShrink: 0,
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Breadcrumbs extra={extra} />
+            </div>
             <ProfileMenu initials={initials} user={user} onLogout={handleLogout} />
+          </header>
+
+          {/* Page content */}
+          <div style={{ flex: 1, overflowY: 'auto', background: c.bg }}>
+            <main style={{ maxWidth: 1000, margin: '0 auto', padding: 24, minHeight: '100%', boxSizing: 'border-box' }}>
+              <Outlet />
+            </main>
           </div>
-          <main style={{ flex: 1, overflowY: 'auto', padding: 28, minWidth: 0 }}><Outlet /></main>
         </div>
       </div>
     </BreadcrumbCtx.Provider>
   )
-}
-
-const M = {
-  topbar: { height: 52, background: c.surface, borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 50, boxShadow: c.sm },
-  logoImg: { width: 26, height: 26, borderRadius: 6, objectFit: 'contain', flexShrink: 0 },
-  bottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, height: 58, background: c.surface, borderTop: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)', zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom)' },
-  bottomNavItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' },
 }

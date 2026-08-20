@@ -1,10 +1,10 @@
 export const c = {
   // Brand
-  primary:       '#006B5E',
-  primaryDark:   '#004D44',
-  primaryLight:  '#008577',
-  primaryBg:     '#E6F4F2',
-  primaryBorder: '#99CEC8',
+  primary:       '#111827',
+  primaryDark:   '#000000',
+  primaryLight:  '#374151',
+  primaryBg:     '#F3F4F6',
+  primaryBorder: '#D1D5DB',
 
   // Accent
   accent:        '#C9A227',
@@ -15,11 +15,11 @@ export const c = {
   sidebarBorder: '#E2E8F0',
   sidebarText:   '#374151',
   sidebarMuted:  '#9CA3AF',
-  sidebarActive: '#006B5E',
-  sidebarActiveBg: '#E6F4F2',
+  sidebarActive: '#111827',
+  sidebarActiveBg: '#F3F4F6',
 
   // Surface
-  bg:            '#F0F2F5',
+  bg:            '#f4f5f6',
   bgDeep:        '#E4E8ED',
   surface:       '#FFFFFF',
   surfaceRaised: '#FAFBFC',

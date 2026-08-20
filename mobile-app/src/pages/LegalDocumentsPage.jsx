@@ -4,6 +4,8 @@ import { erpAPI } from '@/services/api'
 import { Icon } from '@/components/Icons'
 import { c } from '@/theme'
 import { PageWrap, PageHeader, Card, LoadingBlock } from '@/components/Shared'
+import { PageTopBar } from '@/components/ui/TopBar'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const ERP_BASE = 'https://erp.egc-me.com'
 function erpUrl(path) {
@@ -156,14 +158,14 @@ function PassportCard({ pdfPath, emp }) {
 }
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
-function DocSection({ title, icon, iconColor, iconBg, children }) {
+function DocSection({ title, icon, children }) {
   return (
-    <div style={{marginBottom:28}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-        <div style={{width:36,height:36,borderRadius:9,background:iconBg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-          <Icon name={icon} size={17} color={iconColor}/>
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon name={icon} size={16} color={c.textSub} />
         </div>
-        <div style={{fontSize:15,fontWeight:700,color:c.text}}>{title}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: c.text }}>{title}</div>
       </div>
       {children}
     </div>
@@ -185,38 +187,48 @@ export default function LegalDocumentsPage() {
       .finally(() => setLoading(false))
   }, [user])
 
-  return (
-    <PageWrap>
-      <PageHeader
-        title="Legal Documents"
-        sub="Your IQAMA / National ID and passport documents from ERPNext"
-      />
+  const isMobile = useIsMobile()
 
-      {loading && <LoadingBlock text="Loading documents…"/>}
-
+  const body = (
+    <>
+      {loading && <LoadingBlock text="Loading documents…" />}
       {error && (
-        <div style={{padding:'14px 16px',background:c.redBg,border:`1px solid ${c.redBorder}`,borderRadius:8,fontSize:13,color:c.red,display:'flex',gap:8}}>
-          <Icon name="alertCircle" size={15} color={c.red} style={{flexShrink:0}}/> {error}
+        <div style={{ padding: '14px 16px', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 8, fontSize: 13, color: '#DC2626', display: 'flex', gap: 8 }}>
+          <Icon name="alertCircle" size={15} color="#DC2626" style={{ flexShrink: 0 }} /> {error}
         </div>
       )}
-
       {!loading && !error && !user?.erp_employee_id && (
-        <div style={{padding:'14px 16px',background:c.orangeBg,border:`1px solid ${c.orangeBorder}`,borderRadius:8,fontSize:13,color:c.textSub}}>
+        <div style={{ padding: '14px 16px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, fontSize: 13, color: c.textSub }}>
           Your account is not linked to an ERPNext employee record. Contact your administrator.
         </div>
       )}
-
       {emp && (
-        <div style={{maxWidth:680}}>
-          <DocSection title="IQAMA / National ID" icon="idCard" iconColor="#2563EB" iconBg="#DBEAFE">
-            <IqamaCard imageUrl={emp.custom_iqamaid_image}/>
+        <div style={{ maxWidth: 680 }}>
+          <DocSection title="IQAMA / National ID" icon="idCard">
+            <IqamaCard imageUrl={emp.custom_iqamaid_image} />
           </DocSection>
-
-          <DocSection title="Passport" icon="passport" iconColor="#7C3AED" iconBg="#EDE9FE">
-            <PassportCard pdfPath={emp.custom_passport_frontpage} emp={emp}/>
+          <DocSection title="Passport" icon="passport">
+            <PassportCard pdfPath={emp.custom_passport_frontpage} emp={emp} />
           </DocSection>
         </div>
       )}
+    </>
+  )
+
+  if (isMobile) {
+    return (
+      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+        <PageTopBar title="Documents" />
+        <div style={{ padding: '16px 16px 40px' }}>{body}</div>
+      </div>
+    )
+  }
+
+  // Desktop
+  return (
+    <PageWrap>
+      <PageHeader title="Legal Documents" sub="Your IQAMA / National ID and passport documents from ERPNext" />
+      {body}
     </PageWrap>
   )
 }
