@@ -64,6 +64,11 @@ def init_indexes(db: Database):
     db.push_subscriptions.create_index("endpoint", unique=True)
     db.push_subscriptions.create_index("user_id")
 
+    # Deduction requests
+    db.deduction_requests.create_index([("requested_by_user_id", 1), ("submitted_at", -1)])
+    db.deduction_requests.create_index([("employee_erp_id", 1), ("submitted_at", -1)])
+    db.deduction_requests.create_index("status")
+
 
 def init_timesheet_indexes(db: Database):
     """Alias kept for backward-compat — all indexes now live in init_indexes()."""

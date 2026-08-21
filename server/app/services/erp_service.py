@@ -112,6 +112,28 @@ class ERPNextService:
 
         return {"employees": employees, "total": total, "page": page, "page_length": page_length}
 
+    def search_employees_for_picker(self, search: str = None, limit: int = 20) -> list[dict]:
+        """Active-employee search for an in-app picker (e.g. a supervisor
+        flagging who a Deduction Request is about) - unlike
+        get_employee_list(), this does NOT exclude employees who already
+        have an EGC App account. That custom_egc_portal exclusion exists
+        specifically for the "sync a new user from ERP" admin flow in
+        UsersPage; a picker meant to find someone already using the app
+        needs the opposite - most real employees ARE already onboarded."""
+        fields = ["name", "employee_name", "department", "designation"]
+        filters = [["status", "=", "Active"]]
+        search = (search or "").strip()
+        if search:
+            filters.append(["employee_name", "like", f"%{search}%"])
+        params = {
+            "fields": json.dumps(fields),
+            "filters": json.dumps(filters),
+            "limit_page_length": limit,
+            "order_by": "employee_name asc",
+        }
+        data = self._get("api/resource/Employee", params)
+        return data.get("data", [])
+
     def get_employee(self, employee_id):
         return self._get(f"api/resource/Employee/{employee_id}").get("data", {})
 

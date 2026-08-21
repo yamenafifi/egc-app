@@ -118,6 +118,22 @@ export const leaveAPI = {
   reject: (id, remarks) => api.post(`/leave/requests/${id}/reject`, { remarks }),
 }
 
+export const deductionsAPI = {
+  searchEmployees: (search) => api.get('/deductions/employees', { params: { search } }),
+  createRequest: (payload) => api.post('/deductions/requests', payload),
+  myRequests: () => api.get('/deductions/requests/mine'),
+  pendingRequests: () => api.get('/deductions/requests/pending'),
+  getRequest: (id) => api.get(`/deductions/requests/${id}`),
+  convertRequest: (id, payload) => api.post(`/deductions/requests/${id}/convert`, payload),
+  dismissRequest: (id, resolution_note) => api.post(`/deductions/requests/${id}/dismiss`, { resolution_note }),
+  categories: () => api.get('/deductions/categories'),
+  mine: () => api.get('/deductions/mine'),
+  appeal: (name, appeal_reason) => api.post(`/deductions/${name}/appeal`, { appeal_reason }),
+  pendingAppeals: () => api.get('/deductions/appeals/pending'),
+  resolveAppeal: (name, outcome, resolution_notes) =>
+    api.post(`/deductions/${name}/resolve-appeal`, { outcome, resolution_notes }),
+}
+
 export const notificationsAPI = {
   list: (params) => api.get('/notifications', { params }),
   unreadCount: () => api.get('/notifications/unread-count'),

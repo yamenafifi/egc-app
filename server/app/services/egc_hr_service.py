@@ -112,5 +112,45 @@ class EGCHRService:
         result = self._get("project_site.list_active")
         return result if isinstance(result, list) else []
 
+    # ── Deduction ────────────────────────────────────────────────────────────
+
+    def create_deduction(self, payload: dict) -> dict:
+        return self._post("deduction.create", {"payload": payload})
+
+    def list_deductions_for_employee(
+        self, employee_reference: str, period_start: str = None, period_end: str = None,
+    ) -> list[dict]:
+        params = {"employee_reference": employee_reference}
+        if period_start and period_end:
+            params["period_start"] = period_start
+            params["period_end"] = period_end
+        result = self._get("deduction.list_for_employee", params)
+        return result if isinstance(result, list) else []
+
+    def list_deduction_categories(self) -> list[dict]:
+        result = self._get("deduction.list_categories")
+        return result if isinstance(result, list) else []
+
+    def appeal_deduction(self, deduction: str, employee_reference: str, appeal_reason: str) -> dict:
+        return self._post("deduction.appeal", {"payload": {
+            "deduction": deduction,
+            "employee_reference": employee_reference,
+            "appeal_reason": appeal_reason,
+        }})
+
+    def list_pending_deduction_appeals(self) -> list[dict]:
+        result = self._get("deduction.list_pending_appeals")
+        return result if isinstance(result, list) else []
+
+    def resolve_deduction_appeal(
+        self, deduction: str, resolved_by_reference: str, outcome: str, resolution_notes: str = None,
+    ) -> dict:
+        return self._post("deduction.resolve_appeal", {"payload": {
+            "deduction": deduction,
+            "resolved_by_reference": resolved_by_reference,
+            "outcome": outcome,
+            "resolution_notes": resolution_notes,
+        }})
+
 
 egc_hr_service = EGCHRService()

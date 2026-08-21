@@ -28,6 +28,9 @@ const ROUTE_MAP = {
   '/leaves': 'Leaves',
   '/notifications': 'Notifications',
   '/project-supervisors': 'Project Supervisors',
+  '/deductions/new': 'Flag a Deduction',
+  '/deductions/mine': 'My Deductions',
+  '/deductions/review': 'Deductions',
 }
 
 // ── Breadcrumbs (desktop only) ─────────────────────────────────────────────────
@@ -156,6 +159,7 @@ function BottomNav({ tabs, hasAdmin, hasPermission }) {
     { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
     { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
     { to: '/attendance/final-approval', label: 'Final Approval', icon: 'checkCircle', perm: 'attendance.final_approve' },
+    { to: '/deductions/review', label: 'Deductions', icon: 'alertCircle', perm: 'deductions.review' },
   ].filter(item => hasPermission(item.perm))
 
   return (
@@ -278,6 +282,7 @@ export default function AppLayout() {
     { to: '/system-settings', label: 'Settings', icon: 'settings', perm: 'system.manage_settings' },
     { to: '/project-supervisors', label: 'Project Supervisors', icon: 'mapPin', perm: 'erp.manage_project_supervisors' },
     { to: '/attendance/final-approval', label: 'Final Approval', icon: 'checkCircle', perm: 'attendance.final_approve' },
+    { to: '/deductions/review', label: 'Deductions', icon: 'alertCircle', perm: 'deductions.review' },
   ]
   const visibleDesktop = DESKTOP_NAV.filter(n => !n.perm || hasPermission(n.perm))
 

@@ -22,6 +22,9 @@ import LeavesPage from '@/pages/LeavesPage'
 import FinalApprovalPage from '@/pages/FinalApprovalPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import ProjectSupervisorsPage from '@/pages/ProjectSupervisorsPage'
+import DeductionRequestPage from '@/pages/DeductionRequestPage'
+import DeductionsReviewPage from '@/pages/DeductionsReviewPage'
+import MyDeductionsPage from '@/pages/MyDeductionsPage'
 
 export default function App() {
   return (
@@ -44,12 +47,15 @@ export default function App() {
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="leaves" element={<LeavesPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="deductions/new" element={<DeductionRequestPage />} />
+              <Route path="deductions/mine" element={<MyDeductionsPage />} />
               {/* Admin routes */}
               <Route path="users" element={<ProtectedRoute permission="users.view_list"><UsersPage /></ProtectedRoute>} />
               <Route path="permission-templates" element={<ProtectedRoute permission="permission_templates.view"><PermissionTemplatesPage /></ProtectedRoute>} />
               <Route path="system-settings" element={<ProtectedRoute permission="system.manage_settings"><SystemSettingsPage /></ProtectedRoute>} />
               <Route path="project-supervisors" element={<ProtectedRoute permission="erp.manage_project_supervisors"><ProjectSupervisorsPage /></ProtectedRoute>} />
               <Route path="attendance/final-approval" element={<ProtectedRoute permission="attendance.final_approve"><FinalApprovalPage /></ProtectedRoute>} />
+              <Route path="deductions/review" element={<ProtectedRoute permission="deductions.review"><DeductionsReviewPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>

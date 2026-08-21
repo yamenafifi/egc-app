@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icons'
 import MenuList from '@/components/ui/MenuList'
 import { AppTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { attendanceAPI, leaveAPI } from '@/services/api'
+import { attendanceAPI, leaveAPI, deductionsAPI } from '@/services/api'
 import CheckInSheet from '@/components/attendance/CheckInSheet'
 
 function formatElapsed(ms) {
@@ -52,8 +52,10 @@ export default function HomePage() {
   const [teamAttendanceCount, setTeamAttendanceCount] = useState(0)
   const [teamLeaveCount, setTeamLeaveCount] = useState(0)
   const [finalApprovalCount, setFinalApprovalCount] = useState(0)
+  const [deductionReviewCount, setDeductionReviewCount] = useState(0)
 
   const canFinalApprove = hasPermission('attendance.final_approve')
+  const canReviewDeductions = hasPermission('deductions.review')
 
   const loadOpenRecord = useCallback(async () => {
     try {
@@ -88,7 +90,15 @@ export default function HomePage() {
         setFinalApprovalCount((data.submissions || []).length)
       } catch { setFinalApprovalCount(0) }
     }
-  }, [canFinalApprove])
+    if (canReviewDeductions) {
+      try {
+        const [{ data: reqData }, { data: appealData }] = await Promise.all([
+          deductionsAPI.pendingRequests(), deductionsAPI.pendingAppeals(),
+        ])
+        setDeductionReviewCount((reqData.requests || []).length + (appealData.deductions || []).length)
+      } catch { setDeductionReviewCount(0) }
+    }
+  }, [canFinalApprove, canReviewDeductions])
 
   useEffect(() => { loadOpenRecord(); loadUnsubmitted(); loadReminders() }, [loadOpenRecord, loadUnsubmitted, loadReminders])
 
@@ -117,6 +127,8 @@ export default function HomePage() {
 
   const quickLinks = [
     { icon: 'calendar',    label: 'Request Leave',      onClick: () => navigate('/leave/new') },
+    { icon: 'alertCircle', label: 'Flag a Deduction',   onClick: () => navigate('/deductions/new') },
+    { icon: 'creditCard',  label: 'My Deductions',       onClick: () => navigate('/deductions/mine') },
     { icon: 'idCard',      label: 'Employee Card',       onClick: () => navigate('/employee-card') },
     { icon: 'passport',    label: 'Documents',            onClick: () => navigate('/legal-documents') },
     { icon: 'dollarSign',  label: 'Claim an Expense',   onClick: () => {} },
@@ -127,7 +139,8 @@ export default function HomePage() {
   const erpLinked = !!user?.erp_employee_id
   const checkInDisabled = openRecord === undefined || !erpLinked
 
-  const hasReminders = unsubmitted.length > 0 || teamAttendanceCount > 0 || teamLeaveCount > 0 || finalApprovalCount > 0
+  const hasReminders = unsubmitted.length > 0 || teamAttendanceCount > 0 || teamLeaveCount > 0
+    || finalApprovalCount > 0 || deductionReviewCount > 0
 
   const content = (
     <div style={{ padding: isMobile ? '16px 16px 32px' : '0', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: isMobile ? '100%' : 640 }}>
@@ -213,6 +226,15 @@ export default function HomePage() {
               title={`${finalApprovalCount} submission${finalApprovalCount !== 1 ? 's' : ''} awaiting final approval`}
               subtitle="Tap to review"
               onClick={() => navigate('/attendance/final-approval')}
+            />
+          )}
+
+          {deductionReviewCount > 0 && (
+            <ReminderCard
+              icon="alertCircle"
+              title={`${deductionReviewCount} deduction item${deductionReviewCount !== 1 ? 's' : ''} awaiting your review`}
+              subtitle="Requests and appeals"
+              onClick={() => navigate('/deductions/review')}
             />
           )}
         </div>

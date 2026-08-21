@@ -25,6 +25,10 @@ ATTENDANCE_NODES = {
     "attendance.final_approve": "Give final approval on supervisor-approved attendance submissions, pushing them to egc_hr",
 }
 
+DEDUCTION_NODES = {
+    "deductions.review": "Review supervisor Deduction Requests and employee appeals, and convert requests into real payroll Deductions",
+}
+
 TEMPLATE_NODES = {
     "permission_templates.view": "View permission templates",
     "permission_templates.create": "Create a new permission template",
@@ -41,6 +45,7 @@ ALL_NODES: dict = {
     **AUTH_NODES,
     **ERP_NODES,
     **ATTENDANCE_NODES,
+    **DEDUCTION_NODES,
     **TEMPLATE_NODES,
     **SYSTEM_NODES,
 }
