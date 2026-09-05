@@ -1,6 +1,6 @@
 // Bump this on every real deploy that needs to force stale caches out -
 // activate() below deletes any cache whose name doesn't match this one.
-const CACHE = 'egc-v3'
+const CACHE = 'egc-v4'
 const STATIC = ['/', '/index.html']
 
 self.addEventListener('install', e => {
