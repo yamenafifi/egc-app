@@ -7,6 +7,7 @@ import { PageHeader, Panel, PrimaryButton, SecondaryButton } from '@/desktop/com
 import Drawer from '@/desktop/components/Drawer'
 import Badge from '@/desktop/components/Badge'
 import DataTable from '@/desktop/components/DataTable'
+import ImportExportButton from '@/desktop/components/ImportExportButton'
 
 const TABS = [
   { key: 'general', label: 'General' },
@@ -392,7 +393,16 @@ function ExpenseCategoriesCard({ canEdit }) {
   return (
     <Panel
       title="Expense Categories"
-      action={canEdit && <PrimaryButton icon={<Icon name="plus" size={13} />} onClick={() => setEditing({})}>Add Category</PrimaryButton>}
+      action={canEdit && (
+        <div className="flex items-center gap-2">
+          <ImportExportButton
+            entityLabel="Expense Categories" filenameBase="expense_categories"
+            onExport={expenseCategoriesAPI.export} onImportTemplate={expenseCategoriesAPI.importTemplate}
+            onImport={expenseCategoriesAPI.import} onImported={loadCategories}
+          />
+          <PrimaryButton icon={<Icon name="plus" size={13} />} onClick={() => setEditing({})}>Add Category</PrimaryButton>
+        </div>
+      )}
     >
       <p className="text-xs text-slate-500 mb-3">
         Each category's description is sent to the AI so it can classify every extracted receipt automatically.

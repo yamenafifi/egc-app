@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icons'
 import { PageHeader, Panel, PrimaryButton, SecondaryButton } from '@/desktop/components/Page'
 import DataTable from '@/desktop/components/DataTable'
 import Badge from '@/desktop/components/Badge'
+import ImportExportButton from '@/desktop/components/ImportExportButton'
 
 const initials = n => n?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 const fmtDate = iso => !iso ? 'Never' : new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -423,8 +424,19 @@ export default function UsersPage() {
       <PageHeader
         title="User Accounts"
         sub={`${total} account${total !== 1 ? 's' : ''}`}
-        action={hasPermission('users.create') && (
-          <PrimaryButton onClick={() => setShowCreate(true)} icon={<Icon name="plus" size={14} />}>New Account</PrimaryButton>
+        action={(
+          <div className="flex items-center gap-2">
+            {hasPermission('users.edit_permissions') && (
+              <ImportExportButton
+                entityLabel="Users" filenameBase="users"
+                onExport={usersAPI.export} onImportTemplate={usersAPI.importTemplate}
+                onImport={usersAPI.import} onImported={load}
+              />
+            )}
+            {hasPermission('users.create') && (
+              <PrimaryButton onClick={() => setShowCreate(true)} icon={<Icon name="plus" size={14} />}>New Account</PrimaryButton>
+            )}
+          </div>
         )}
       />
 

@@ -9,9 +9,20 @@ PATCH  /api/users/<id>/reactivate        — reactivate
 POST   /api/users/<id>/reset-password    — admin reset password
 GET    /api/users/<id>/permissions       — get user permissions
 PUT    /api/users/<id>/permissions       — replace user permissions
+GET    /api/users/export                 — every account as an .xlsx (also doubles as
+                                            the "Update existing records" import template)
+GET    /api/users/import-template        — a blank .xlsx with just the column headers
+POST   /api/users/import                 — bulk-update is_active/permissions from an
+                                            uploaded .xlsx - see import_users() below;
+                                            creating new accounts via import is NOT
+                                            supported (a real account needs an ERP
+                                            employee link and a password - use "New
+                                            Account" on the Users page for that)
 """
 
-from flask import Blueprint, request, jsonify, g
+from datetime import datetime, timezone
+
+from flask import Blueprint, request, jsonify, g, send_file
 from bson import ObjectId
 
 from app.services.auth_service import auth_service, AuthError
@@ -19,6 +30,7 @@ from app.services.permission_service import permission_service
 from app.middleware.auth_middleware import require_permission, jwt_required_custom
 from app.utils.database import get_db
 from app.models.user import UserModel
+from app.services import xlsx_service
 
 bp = Blueprint("users", __name__, url_prefix="/api/users")
 
@@ -57,6 +69,138 @@ def list_users():
     total  = db[UserModel.COLLECTION].count_documents(query)
 
     return jsonify({"users": users, "total": total, "page": page, "page_length": page_length}), 200
+
+
+_EXPORT_HEADERS = ["ID", "Username", "Display Name", "English Name", "Department", "Designation", "Active", "ERP Employee ID", "Permissions"]
+_TEMPLATE_HEADERS = ["ID", "Active", "Permissions"]
+
+
+def _export_row(u: dict) -> list:
+    return [
+        str(u["_id"]), u.get("username"), u.get("display_name"), u.get("en_display_name") or "",
+        u.get("department") or "", u.get("designation") or "",
+        "Active" if u.get("is_active", True) else "Inactive",
+        u.get("erp_employee_id") or "",
+        "; ".join(u.get("permissions", [])),
+    ]
+
+
+@bp.route("/export", methods=["GET"])
+@require_permission("users.view_list")
+def export_users():
+    db = get_db()
+    # Sysadmin is excluded - its permissions/active state can't be changed
+    # (see auth_service.deactivate_account/update_user_permissions), so it
+    # has no place in a sheet meant for bulk-editing those two fields.
+    users = db[UserModel.COLLECTION].find({"is_sysadmin": {"$ne": True}}).sort("display_name", 1)
+    rows = [_export_row(u) for u in users]
+    buf = xlsx_service.build_workbook(_EXPORT_HEADERS, rows)
+    return send_file(buf, as_attachment=True, download_name="users.xlsx", mimetype=xlsx_service.XLSX_MIMETYPE)
+
+
+@bp.route("/import-template", methods=["GET"])
+@require_permission("users.edit_permissions")
+def download_import_template():
+    # Only ID/Active/Permissions are ever read back on import (see
+    # import_users() below) - Username/Display Name/etc. are ERP-sourced and
+    # kept current by sync_from_erp, so a blank "add columns to fill in"
+    # template for them would silently do nothing useful.
+    buf = xlsx_service.build_workbook(_TEMPLATE_HEADERS, [])
+    return send_file(buf, as_attachment=True, download_name="users_template.xlsx", mimetype=xlsx_service.XLSX_MIMETYPE)
+
+
+def _parse_active(value) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value is None or str(value).strip() == "":
+        return None
+    s = str(value).strip().lower()
+    if s in ("active", "true", "yes", "1"):
+        return True
+    if s in ("inactive", "false", "no", "0"):
+        return False
+    return None
+
+
+@bp.route("/import", methods=["POST"])
+@require_permission("users.edit_permissions")
+def import_users():
+    file = request.files.get("file")
+    update_existing = request.form.get("update_existing") == "true"
+    if not file:
+        return jsonify({"error": "An .xlsx file is required."}), 400
+
+    if not update_existing:
+        return jsonify({
+            "error": "Creating new user accounts via import isn't supported - a real account "
+                     "needs an ERP employee link and a password. Use \"New Account\" on the "
+                     "Users page, or enable \"Update existing records\" to bulk-edit accounts "
+                     "that already exist.",
+        }), 400
+
+    try:
+        headers, rows = xlsx_service.read_workbook(file.stream)
+    except Exception:
+        return jsonify({"error": "Could not read that file - make sure it's a valid .xlsx exported or downloaded from here."}), 400
+
+    got = {h.strip().lower() for h in headers}
+    if "id" not in got:
+        return jsonify({"error": "Missing required column: ID"}), 400
+
+    from app.utils.permissions import ALL_NODES
+
+    db = get_db()
+    updated = 0
+    errors = []
+
+    for i, row in enumerate(rows, start=2):  # row 1 is the header
+        row_id = str(row.get("id") or "").strip()
+        if not row_id:
+            continue  # fully blank row
+
+        try:
+            user = db[UserModel.COLLECTION].find_one({"_id": ObjectId(row_id)})
+        except Exception:
+            errors.append({"row": i, "error": f"'{row_id}' isn't a valid ID."})
+            continue
+        if not user:
+            errors.append({"row": i, "error": f"No existing account with ID {row_id} - it may have been deleted since this file was downloaded."})
+            continue
+        if user.get("is_sysadmin"):
+            errors.append({"row": i, "error": "The system administrator account cannot be edited."})
+            continue
+
+        row_ok = True
+
+        active = _parse_active(row.get("active"))
+        if active is not None and active != user.get("is_active", True):
+            try:
+                if active:
+                    auth_service.reactivate_account(str(user["_id"]), g.current_user)
+                else:
+                    auth_service.deactivate_account(str(user["_id"]), g.current_user)
+            except AuthError as e:
+                errors.append({"row": i, "error": str(e)})
+                row_ok = False
+
+        perms_cell = row.get("permissions")
+        if perms_cell is not None and str(perms_cell).strip() != "":
+            nodes = [n.strip() for n in str(perms_cell).replace(";", ",").split(",") if n.strip()]
+            invalid = [n for n in nodes if n not in ALL_NODES]
+            if invalid:
+                errors.append({"row": i, "error": f"Unknown permission node(s): {', '.join(invalid)}"})
+                row_ok = False
+            else:
+                try:
+                    auth_service.update_user_permissions(str(user["_id"]), nodes, g.current_user)
+                except AuthError as e:
+                    errors.append({"row": i, "error": str(e)})
+                    row_ok = False
+
+        if row_ok:
+            updated += 1
+
+    return jsonify({"updated": updated, "errors": errors}), 200
 
 
 @bp.route("", methods=["POST"])

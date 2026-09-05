@@ -77,6 +77,11 @@ export const usersAPI = {
   getDevices: (id) => api.get(`/users/${id}/devices`),
   updatePermissions: (id, permissions, template_id) =>
     api.put(`/users/${id}/permissions`, { permissions, template_id }),
+  export: () => api.get('/users/export', { responseType: 'blob' }),
+  importTemplate: () => api.get('/users/import-template', { responseType: 'blob' }),
+  import: (formData) => api.post('/users/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 }
 
 export const erpAPI = {
@@ -169,6 +174,11 @@ export const expenseCategoriesAPI = {
   create: (data) => api.post('/expense-categories', data),
   update: (id, data) => api.put(`/expense-categories/${id}`, data),
   remove: (id) => api.delete(`/expense-categories/${id}`),
+  export: () => api.get('/expense-categories/export', { responseType: 'blob' }),
+  importTemplate: () => api.get('/expense-categories/import-template', { responseType: 'blob' }),
+  import: (formData) => api.post('/expense-categories/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 }
 
 export const notificationsAPI = {
