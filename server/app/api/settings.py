@@ -10,6 +10,10 @@ PUT  /erp-integration     — update ERPNext/egc_hr connection config (same perm
 GET  /erp-integration/test — pings both ERPNext and egc_hr with the currently
                              saved credentials, so an admin can verify a change
                              before walking away from the page
+GET  /gemini                — Gemini (receipt AI extraction) config (requires
+                             system.manage_settings - the API key is a real secret)
+PUT  /gemini                — update Gemini config (same permission)
+GET  /gemini/test           — pings Gemini with the currently saved key/model
 GET  /modules              — which of the app's four subsystems are enabled
                              (any authenticated user - the frontend nav/dashboard
                              need this on every load)
@@ -28,7 +32,8 @@ from flask import Blueprint, request, jsonify
 from app.middleware.auth_middleware import require_permission, jwt_required_custom
 from app.utils.database import get_db
 from app.services.settings_service import (
-    GENERAL_DEFAULTS, ERP_INTEGRATION_DEFAULTS, MODULE_DEFAULTS, TIMESHEET_SETTINGS_DEFAULTS,
+    GENERAL_DEFAULTS, ERP_INTEGRATION_DEFAULTS, GEMINI_INTEGRATION_DEFAULTS,
+    MODULE_DEFAULTS, TIMESHEET_SETTINGS_DEFAULTS,
     get_settings_doc,
 )
 
@@ -100,6 +105,37 @@ def test_erp_integration():
         "erp_connected": erp_service.ping(),
         "egc_hr_connected": egc_hr_service.ping(),
     }), 200
+
+
+@bp.route("/gemini", methods=["GET"])
+@require_permission("system.manage_settings")
+def get_gemini_integration_settings():
+    db = get_db()
+    doc = get_settings_doc(db)
+    return jsonify({"settings": {k: doc[k] for k in GEMINI_INTEGRATION_DEFAULTS}}), 200
+
+
+@bp.route("/gemini", methods=["PUT"])
+@require_permission("system.manage_settings")
+def update_gemini_integration_settings():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    update = {k: v for k, v in data.items() if k in GEMINI_INTEGRATION_DEFAULTS}
+    if not update:
+        return jsonify({"error": "No valid settings provided."}), 400
+    db.system_settings.update_one({"_id": "global"}, {"$set": update}, upsert=True)
+    doc = get_settings_doc(db)
+    return jsonify({
+        "settings": {k: doc[k] for k in GEMINI_INTEGRATION_DEFAULTS},
+        "message": "Gemini settings updated.",
+    }), 200
+
+
+@bp.route("/gemini/test", methods=["GET"])
+@require_permission("system.manage_settings")
+def test_gemini_integration():
+    from app.services.gemini_service import ping as gemini_ping
+    return jsonify({"gemini_connected": gemini_ping()}), 200
 
 
 @bp.route("/modules", methods=["GET"])

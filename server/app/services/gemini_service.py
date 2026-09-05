@@ -29,7 +29,7 @@ import time
 
 import requests
 
-from config.settings import Config
+from app.services.settings_service import get_gemini_settings
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 REQUEST_TIMEOUT = 300  # PDF + multi-receipt extraction is not a sub-second call, and this
@@ -195,15 +195,16 @@ def extract_receipts(
     GeminiError on any failure (not configured, unreachable, malformed
     response) - the caller (app/api/expense_claims.py) is responsible
     for leaving the application in a retryable state, never stuck."""
-    if not Config.GEMINI_ENABLED or not Config.GEMINI_API_KEY:
-        raise GeminiError("Gemini is not configured (GEMINI_ENABLED/GEMINI_API_KEY).")
+    settings = get_gemini_settings()
+    if not settings["gemini_enabled"] or not settings["gemini_api_key"]:
+        raise GeminiError("Gemini is not configured - set it under Settings > Expense Claims.")
     if len(pdf_bytes) > MAX_PDF_BYTES:
         raise GeminiError(
             f"Receipts PDF is {len(pdf_bytes) / 1024 / 1024:.1f}MB, over the "
             f"{MAX_PDF_BYTES // 1024 // 1024}MB limit Gemini accepts inline."
         )
 
-    url = f"{API_BASE}/models/{Config.GEMINI_MODEL}:generateContent"
+    url = f"{API_BASE}/models/{settings['gemini_model']}:generateContent"
     body = {
         "contents": [{
             "parts": [
@@ -228,7 +229,7 @@ def extract_receipts(
         try:
             resp = requests.post(
                 url,
-                headers={"Content-Type": "application/json", "X-goog-api-key": Config.GEMINI_API_KEY},
+                headers={"Content-Type": "application/json", "X-goog-api-key": settings["gemini_api_key"]},
                 json=body,
                 timeout=REQUEST_TIMEOUT,
             )
@@ -272,3 +273,24 @@ def extract_receipts(
         raise GeminiError("Gemini's response did not match the expected {receipts: [...]} shape.")
 
     return parsed
+
+
+def ping() -> bool:
+    """A cheap GET on the configured model (no generation, no PDF) - just
+    enough to confirm the API key is valid and that model name exists, for
+    Settings > Expense Claims' "Test Connection" button. Deliberately
+    ignores gemini_enabled - an admin should be able to verify a key
+    before flipping the switch on."""
+    settings = get_gemini_settings()
+    if not settings["gemini_api_key"]:
+        return False
+    try:
+        resp = requests.get(
+            f"{API_BASE}/models/{settings['gemini_model']}",
+            headers={"X-goog-api-key": settings["gemini_api_key"]},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return True
+    except requests.exceptions.RequestException:
+        return False

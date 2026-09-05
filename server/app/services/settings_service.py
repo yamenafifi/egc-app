@@ -48,6 +48,17 @@ ERP_INTEGRATION_DEFAULTS = {
     "egc_hr_api_secret": Config.EGC_HR_API_SECRET,
 }
 
+# Same reasoning as ERP_INTEGRATION_DEFAULTS above, for the one non-ERP
+# credential this app holds - defaults to whatever's in .env so nothing
+# breaks until an admin explicitly overrides it here, and rotating the key
+# takes effect immediately since gemini_service.py reads this fresh per call
+# rather than baking Config.GEMINI_* in at import time.
+GEMINI_INTEGRATION_DEFAULTS = {
+    "gemini_api_key": Config.GEMINI_API_KEY,
+    "gemini_model": Config.GEMINI_MODEL,
+    "gemini_enabled": Config.GEMINI_ENABLED,
+}
+
 # Each of the app's four subsystems can be switched off entirely - the
 # blueprint for each (attendance.py/leave.py/deductions.py/
 # expense_claims.py) gates every one of its own routes on this via a
@@ -70,7 +81,10 @@ TIMESHEET_SETTINGS_DEFAULTS = {
     "timesheet_break_hours": 1,
 }
 
-ALL_DEFAULTS = {**GENERAL_DEFAULTS, **ERP_INTEGRATION_DEFAULTS, **MODULE_DEFAULTS, **TIMESHEET_SETTINGS_DEFAULTS}
+ALL_DEFAULTS = {
+    **GENERAL_DEFAULTS, **ERP_INTEGRATION_DEFAULTS, **GEMINI_INTEGRATION_DEFAULTS,
+    **MODULE_DEFAULTS, **TIMESHEET_SETTINGS_DEFAULTS,
+}
 
 
 def get_settings_doc(db=None) -> dict:
@@ -91,6 +105,13 @@ def get_erp_credentials(db=None) -> dict:
     egc_hr_service.py to read fresh on every outbound call."""
     doc = get_settings_doc(db)
     return {k: doc[k] for k in ERP_INTEGRATION_DEFAULTS}
+
+
+def get_gemini_settings(db=None) -> dict:
+    """Just the Gemini fields, for gemini_service.py to read fresh on
+    every extraction call (see GEMINI_INTEGRATION_DEFAULTS above)."""
+    doc = get_settings_doc(db)
+    return {k: doc[k] for k in GEMINI_INTEGRATION_DEFAULTS}
 
 
 def is_module_enabled(module_key: str, db=None) -> bool:

@@ -57,7 +57,7 @@ from app.services.project_site_cache import get_site
 from app.services.erp_service import erp_service, ERPNextError
 from app.services.expense_claim_processor import run_extraction_job
 from app.services.notification_service import notify, notify_all_with_permission
-from config.settings import Config
+from app.services.settings_service import get_gemini_settings
 
 bp = Blueprint("expense_claims", __name__, url_prefix="/api/expense-claims")
 
@@ -495,11 +495,12 @@ def pending_review():
 @require_permission("expense_claims.review")
 def readiness():
     findings = []
-    if not Config.GEMINI_ENABLED or not Config.GEMINI_API_KEY:
+    gemini_settings = get_gemini_settings()
+    if not gemini_settings["gemini_enabled"] or not gemini_settings["gemini_api_key"]:
         findings.append({
             "severity": "blocker",
             "title": "Gemini is not configured",
-            "detail": "GEMINI_ENABLED/GEMINI_API_KEY must be set before AI extraction can run.",
+            "detail": "Set it under Settings > Expense Claims before AI extraction can run.",
         })
 
     company = request.args.get("company")

@@ -580,10 +580,97 @@ function TimesheetTab({ canEdit }) {
   )
 }
 
+function GeminiIntegrationCard({ canEdit }) {
+  const [values, setValues] = useState(null)
+  const [saved, setSaved] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState(null)
+
+  useEffect(() => {
+    settingsAPI.getGemini()
+      .then(({ data }) => { setValues(data.settings); setSaved(data.settings) })
+      .catch(() => toast.error('Failed to load Gemini settings'))
+  }, [])
+
+  const onChange = (key, value) => setValues(prev => ({ ...prev, [key]: value }))
+  const dirty = values && saved && Object.keys(saved).some(k => values[k] !== saved[k])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const { data } = await settingsAPI.updateGemini(values)
+      setValues(data.settings); setSaved(data.settings)
+      toast.success('Gemini settings updated.')
+    } catch (e) { toast.error(e.response?.data?.error || 'Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  const test = async () => {
+    setTesting(true); setTestResult(null)
+    try { const { data } = await settingsAPI.testGemini(); setTestResult(data) }
+    catch { toast.error('Failed to run the connection test') }
+    finally { setTesting(false) }
+  }
+
+  return (
+    <Panel
+      title="Gemini (AI Receipt Extraction)"
+      action={canEdit && (
+        <div className="flex items-center gap-2">
+          {testResult && <Badge tone={testResult.gemini_connected ? 'green' : 'red'}>{testResult.gemini_connected ? 'Connected' : 'Failed'}</Badge>}
+          <SecondaryButton onClick={test} disabled={testing || !values}>{testing ? 'Testing…' : 'Test Connection'}</SecondaryButton>
+          <PrimaryButton onClick={save} disabled={saving || !dirty}>{saving ? 'Saving…' : 'Save'}</PrimaryButton>
+        </div>
+      )}
+    >
+      <p className="text-xs text-slate-500 mb-4">
+        Powers automatic receipt extraction when an Accountant starts processing a claim. Get an API key from
+        Google AI Studio - Gemini won't run while disabled or while no key is set, even if enabled.
+      </p>
+
+      {!values ? (
+        <div className="text-sm text-slate-400 py-6 text-center">Loading…</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200">
+            <div>
+              <div className="text-sm font-medium text-slate-800">Enable AI extraction</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                When off, "Start Processing" is unavailable on Expense Claims - Accountants enter every receipt field by hand instead.
+              </div>
+            </div>
+            <Toggle checked={!!values.gemini_enabled} onChange={v => onChange('gemini_enabled', v)} disabled={!canEdit} />
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">API Key</label>
+              <input
+                type="password" value={values.gemini_api_key ?? ''} disabled={!canEdit}
+                onChange={e => onChange('gemini_api_key', e.target.value)}
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-md bg-white disabled:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Model</label>
+              <input
+                type="text" value={values.gemini_model ?? ''} disabled={!canEdit} placeholder="gemini-3.6-flash"
+                onChange={e => onChange('gemini_model', e.target.value)}
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-md bg-white disabled:bg-slate-50"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 function ExpenseClaimsTab({ canEdit }) {
   return (
     <div className="flex flex-col gap-5">
       <VatNumberCard canEdit={canEdit} />
+      <GeminiIntegrationCard canEdit={canEdit} />
       <ExpenseCategoriesCard canEdit={canEdit} />
     </div>
   )
