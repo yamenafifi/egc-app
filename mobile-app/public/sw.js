@@ -1,4 +1,6 @@
-const CACHE = 'egc-v1'
+// Bump this on every real deploy that needs to force stale caches out -
+// activate() below deletes any cache whose name doesn't match this one.
+const CACHE = 'egc-v3'
 const STATIC = ['/', '/index.html']
 
 self.addEventListener('install', e => {
@@ -58,14 +60,43 @@ self.addEventListener('fetch', e => {
     )
     return
   }
-  // Cache-first for static assets
+
+  // Navigations (loading the app itself) are network-first, not
+  // cache-first: cache-first here is what let this go stale forever
+  // before - a real deploy landing, or the dev server rebuilding, was
+  // invisible because every refresh kept re-serving whatever HTML/JS
+  // happened to be cached from the very first visit, and a plain
+  // reload can't bypass a service worker's own fetch handler to notice.
+  // Falling back to cache only covers genuinely being offline.
+  if (request.mode === 'navigate') {
+    e.respondWith(
+      fetch(request).then(resp => {
+        if (resp.ok) {
+          const clone = resp.clone()
+          caches.open(CACHE).then(c => c.put(request, clone))
+        }
+        return resp
+      }).catch(() => caches.match(request).then(cached => cached || caches.match('/index.html')))
+    )
+    return
+  }
+
+  // Stale-while-revalidate for everything else (JS/CSS/images): respond
+  // instantly from cache if present for speed, but always also fetch in
+  // the background and overwrite the cache entry - so a change is picked
+  // up on the very next load instead of needing a manual cache-clear
+  // (a plain cache-first here has the identical staleness problem as
+  // navigations did, just for the code files rather than the shell).
   e.respondWith(
-    caches.match(request).then(cached => cached || fetch(request).then(resp => {
-      if (resp.ok && request.method === 'GET') {
-        const clone = resp.clone()
-        caches.open(CACHE).then(c => c.put(request, clone))
-      }
-      return resp
-    }).catch(() => caches.match('/index.html')))
+    caches.match(request).then(cached => {
+      const network = fetch(request).then(resp => {
+        if (resp.ok && request.method === 'GET') {
+          const clone = resp.clone()
+          caches.open(CACHE).then(c => c.put(request, clone))
+        }
+        return resp
+      }).catch(() => cached)
+      return cached || network
+    })
   )
 })

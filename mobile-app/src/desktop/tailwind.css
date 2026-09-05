@@ -1,0 +1,93 @@
+/* Desktop-only design system entry point. preflight is disabled in
+   tailwind.config.js, so this contributes utility classes only - no global
+   reset that could touch the mobile-first inline-style codebase. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .desktop-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  .desktop-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .desktop-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 999px;
+  }
+}
+
+/* Scoped reset for the desktop shell only (preflight is off globally so
+   mobile's inline-style components keep the plain browser defaults they
+   were built against). Without this, every NavLink shows the browser's
+   default underline and every button shows the native focus/tap outline.
+   `@layer base` does NOT help here - Tailwind v3's @layer is a build-time
+   ordering hint, not a real CSS cascade layer (that's a v4 feature), so it
+   compiles to plain flattened CSS and ordinary specificity still applies.
+   `.desktop-root a` has specificity (0,1,1), which beats a single Tailwind
+   utility class like `.text-white` (0,1,0) regardless of where it sits in
+   the file - that's what turned active NavLinks into invisible white-on-
+   near-black text. `:where(.desktop-root)` contributes zero specificity,
+   so the whole selector drops to just the bare element (0,0,1) - lower
+   than any one-class utility, so utilities correctly win. */
+:where(.desktop-root) a {
+  text-decoration: none;
+  color: inherit;
+}
+:where(.desktop-root) button {
+  font: inherit;
+  color: inherit;
+}
+:where(.desktop-root) button,
+:where(.desktop-root) a,
+:where(.desktop-root) input,
+:where(.desktop-root) select,
+:where(.desktop-root) textarea {
+  outline: none;
+}
+/* This is the actual "outline on everything" culprit, not focus - with
+   preflight off, a <button> keeps its native OS chrome: a default 2px
+   OUTSET border on every side. Tailwind's border-{color} utilities only
+   ever set border-color, never border-width/style, so a class like
+   `border-b-2 border-slate-900` (bottom width only, for a tab underline)
+   leaves the native outset border-width/style in place on the other three
+   sides - a beveled 3D box around every button that never asked for a
+   border at all. Tailwind's own preflight fixes this with a universal
+   `border-width:0` reset; replicate it here, scoped to desktop only. */
+:where(.desktop-root) button,
+:where(.desktop-root) input,
+:where(.desktop-root) select,
+:where(.desktop-root) textarea {
+  border-width: 0;
+  border-style: solid;
+}
+/* button-only below: a <select>'s native dropdown arrow (and a checkbox/
+   radio <input>'s native look) comes from the same OS chrome this is
+   otherwise removing - there's no @tailwindcss/forms plugin here to
+   replace it, so stripping appearance/background on those would leave a
+   <select> looking like a plain unmarked text box. Buttons have no such
+   dependency on native appearance. */
+:where(.desktop-root) button {
+  background-color: transparent;
+  background-image: none;
+  appearance: none;
+}
+/* Frappe's own UI never shows a hard, saturated outline - focus is a
+   thin, low-contrast ring via box-shadow (no layout shift from
+   outline-offset, no jarring solid-blue rectangle that reads as "stuck"
+   when a button keeps browser focus after a click). */
+:where(.desktop-root) button:focus-visible,
+:where(.desktop-root) a:focus-visible,
+:where(.desktop-root) input:focus-visible,
+:where(.desktop-root) select:focus-visible,
+:where(.desktop-root) textarea:focus-visible {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+}
+:where(.desktop-root) input:focus-visible,
+:where(.desktop-root) select:focus-visible,
+:where(.desktop-root) textarea:focus-visible {
+  border-color: #94a3b8;
+}

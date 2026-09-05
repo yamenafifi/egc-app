@@ -134,6 +134,43 @@ export const deductionsAPI = {
     api.post(`/deductions/${name}/resolve-appeal`, { outcome, resolution_notes }),
 }
 
+export const expenseClaimsAPI = {
+  submit: (formData) => api.post('/expense-claims', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  listEmployees: () => api.get('/expense-claims/employees'),
+  submitForEmployee: (formData) => api.post('/expense-claims/for-employee', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  mine: () => api.get('/expense-claims/mine'),
+  get: (id) => api.get(`/expense-claims/${id}`),
+  withdraw: (id) => api.post(`/expense-claims/${id}/withdraw`),
+  // responseType: 'blob' - these routes are JWT-gated like everything else,
+  // so a plain <iframe src="..."> can't include the Authorization header.
+  // Fetch via axios instead and feed the blob into an object URL.
+  sourcePdf: (id) => api.get(`/expense-claims/${id}/pdf`, { responseType: 'blob' }),
+  receiptPdf: (id, index) => api.get(`/expense-claims/${id}/receipts/${index}/pdf`, { responseType: 'blob' }),
+  pendingReview: () => api.get('/expense-claims/pending-review'),
+  readiness: (company) => api.get('/expense-claims/readiness', { params: { company } }),
+  process: (id) => api.post(`/expense-claims/${id}/process`),
+  updateReceipt: (id, index, payload) => api.patch(`/expense-claims/${id}/receipts/${index}`, payload),
+  approve: (id) => api.post(`/expense-claims/${id}/approve`),
+  reject: (id, reason) => api.post(`/expense-claims/${id}/reject`, { reason }),
+  pendingFinalApproval: () => api.get('/expense-claims/pending-final-approval'),
+  finalApprove: (application_ids) => api.post('/expense-claims/final-approve', { application_ids }),
+  finalReject: (application_ids, reason) => api.post('/expense-claims/final-reject', { application_ids, reason }),
+  searchReceipts: (params) => api.get('/expense-claims/receipts/search', { params }),
+  exportReceiptsZip: (params) => api.get('/expense-claims/receipts/export-zip', { params, responseType: 'blob' }),
+}
+
+export const expenseCategoriesAPI = {
+  list: () => api.get('/expense-categories'),
+  accounts: (company) => api.get('/expense-categories/accounts', { params: { company } }),
+  create: (data) => api.post('/expense-categories', data),
+  update: (id, data) => api.put(`/expense-categories/${id}`, data),
+  remove: (id) => api.delete(`/expense-categories/${id}`),
+}
+
 export const notificationsAPI = {
   list: (params) => api.get('/notifications', { params }),
   unreadCount: () => api.get('/notifications/unread-count'),
@@ -146,6 +183,7 @@ export const notificationsAPI = {
 
 export const templatesAPI = {
   list: () => api.get('/permission-templates'),
+  getNodes: () => api.get('/permission-templates/nodes'),
   get: (id) => api.get(`/permission-templates/${id}`),
   create: (data) => api.post('/permission-templates', data),
   update: (id, data) => api.put(`/permission-templates/${id}`, data),
@@ -157,4 +195,11 @@ export const templatesAPI = {
 export const settingsAPI = {
   get: () => api.get('/settings'),
   update: (data) => api.put('/settings', data),
+  getErpIntegration: () => api.get('/settings/erp-integration'),
+  updateErpIntegration: (data) => api.put('/settings/erp-integration', data),
+  testErpIntegration: () => api.get('/settings/erp-integration/test'),
+  getModules: () => api.get('/settings/modules'),
+  updateModules: (data) => api.put('/settings/modules', data),
+  getTimesheetSettings: () => api.get('/settings/timesheet'),
+  updateTimesheetSettings: (data) => api.put('/settings/timesheet', data),
 }

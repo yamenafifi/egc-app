@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usersAPI, erpAPI, templatesAPI } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import { useBreadcrumb } from '@/components/layout/AppLayout'
 import { useLang } from '@/context/LangContext'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Icon } from '@/components/Icons'
 import { c } from '@/theme'
 import toast from 'react-hot-toast'
+const DesktopUsersPage = lazy(() => import('@/pages/desktop/UsersPage')) // see App.jsx's top comment - split out of the initial bundle
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const initials = n => n?.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()||'?'
@@ -371,7 +373,7 @@ function CreateModal({ onClose, onCreated }) {
                 <label style={MD.label}>Search ERPNext Employees</label>
                 <div style={{position:'relative'}}>
                   <Icon name="search" size={14} color={c.textMuted} style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}/>
-                  <input style={{...MD.input,paddingLeft:36}} placeholder="Search by name…" value={erpSearch} onChange={e=>setErpSearch(e.target.value)} autoFocus/>
+                  <input style={{...MD.input,paddingLeft:36}} placeholder="Search by name or Employee ID…" value={erpSearch} onChange={e=>setErpSearch(e.target.value)} autoFocus/>
                 </div>
               </div>
               <div style={MD.list}>
@@ -481,8 +483,8 @@ function CreateModal({ onClose, onCreated }) {
   )
 }
 
-// ── Main Users List ───────────────────────────────────────────────────────────
-export default function UsersPage() {
+// ── Main Users List (mobile) - desktop is pages/desktop/UsersPage.jsx ────────
+function MobileUsersPage() {
   const { hasPermission } = useAuth()
   const { t } = useLang()
   const [users, setUsers] = useState([])
@@ -583,6 +585,11 @@ export default function UsersPage() {
       {showCreate && <CreateModal onClose={()=>setShowCreate(false)} onCreated={()=>{setShowCreate(false);load()}}/>}
     </div>
   )
+}
+
+export default function UsersPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileUsersPage /> : <DesktopUsersPage />
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────

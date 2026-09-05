@@ -9,3 +9,6 @@ marshmallow==3.21.3
 flasgger==0.9.7.1
 gunicorn==22.0.0
 pywebpush==2.0.0
+pypdf==4.3.1
+pymupdf==1.28.2
+opencv-python==4.13.0.92

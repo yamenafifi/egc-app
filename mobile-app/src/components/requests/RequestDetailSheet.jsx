@@ -36,7 +36,14 @@ function btnStyle(kind) {
 // manager's Approve/Reject on a supervisor_approved one (the single-item
 // counterpart to FinalApprovalPage's bulk action). The server re-checks
 // authority regardless in both cases; this is UI polish only.
-export default function RequestDetailSheet({ item, mode, onClose, onActioned }) {
+//
+// Split into RequestDetailContent (this) + RequestDetailSheet (below) so
+// the exact same content can render either inside a mobile BottomSheet or
+// inline in a desktop MasterDetail pane - same component, different
+// mount point, no behavior fork. onClose means "dismiss this detail" in
+// both cases: closing the sheet on mobile, clearing the selection on
+// desktop.
+export function RequestDetailContent({ item, mode, onClose, onActioned }) {
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -93,7 +100,6 @@ export default function RequestDetailSheet({ item, mode, onClose, onActioned }) 
   }
 
   return (
-    <BottomSheet open={!!item} onClose={onClose} title={item.kind === 'leave' ? 'Leave Request' : 'Attendance Submission'}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
@@ -187,6 +193,15 @@ export default function RequestDetailSheet({ item, mode, onClose, onActioned }) 
           )
         )}
       </div>
+  )
+}
+
+// Mobile chrome: same content, docked in a bottom sheet.
+export default function RequestDetailSheet({ item, mode, onClose, onActioned }) {
+  if (!item) return null
+  return (
+    <BottomSheet open={!!item} onClose={onClose} title={item.kind === 'leave' ? 'Leave Request' : 'Attendance Submission'}>
+      <RequestDetailContent item={item} mode={mode} onClose={onClose} onActioned={onActioned} />
     </BottomSheet>
   )
 }

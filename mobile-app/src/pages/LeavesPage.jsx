@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
@@ -8,9 +8,10 @@ import { leaveAPI } from '@/services/api'
 import { normalizeLeaveRequest, sortByMostRecent } from '@/utils/requests'
 import RequestRow from '@/components/requests/RequestRow'
 import RequestDetailSheet from '@/components/requests/RequestDetailSheet'
+const DesktopLeavesPage = lazy(() => import('@/pages/desktop/LeavesPage')) // see App.jsx's top comment - split out of the initial bundle
 
-export default function LeavesPage() {
-  const isMobile = useIsMobile()
+// Mobile card list. Desktop is pages/desktop/LeavesPage.jsx - a real table.
+function MobileLeavesPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -96,24 +97,16 @@ export default function LeavesPage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Leaves" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Leaves</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Your leave requests, and anything awaiting your review.</p>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Leaves" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />
     </div>
   )
+}
+
+export default function LeavesPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileLeavesPage /> : <DesktopLeavesPage />
 }

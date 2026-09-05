@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
@@ -6,6 +6,7 @@ import BottomSheet from '@/components/ui/BottomSheet'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { erpAPI } from '@/services/api'
+const DesktopProjectSupervisorsPage = lazy(() => import('@/pages/desktop/ProjectSupervisorsPage')) // see App.jsx's top comment - split out of the initial bundle
 
 function EditSupervisorsSheet({ project, onClose, onSaved }) {
   const [search, setSearch] = useState('')
@@ -101,8 +102,7 @@ function EditSupervisorsSheet({ project, onClose, onSaved }) {
   )
 }
 
-export default function ProjectSupervisorsPage() {
-  const isMobile = useIsMobile()
+function MobileProjectSupervisorsPage() {
   const [sites, setSites] = useState(null)
   const [editing, setEditing] = useState(null)
 
@@ -147,24 +147,16 @@ export default function ProjectSupervisorsPage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Project Supervisors" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        <EditSupervisorsSheet project={editing} onClose={() => setEditing(null)} onSaved={load} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Project Supervisors</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Assign who can approve attendance submissions for each project site.</p>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Project Supervisors" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <EditSupervisorsSheet project={editing} onClose={() => setEditing(null)} onSaved={load} />
     </div>
   )
+}
+
+export default function ProjectSupervisorsPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileProjectSupervisorsPage /> : <DesktopProjectSupervisorsPage />
 }

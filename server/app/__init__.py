@@ -41,6 +41,8 @@ def create_app() -> Flask:
     from app.api.leave import bp as leave_bp
     from app.api.deductions import bp as deductions_bp
     from app.api.notifications import bp as notifications_bp
+    from app.api.expense_claims import bp as expense_claims_bp
+    from app.api.expense_categories import bp as expense_categories_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
@@ -51,6 +53,8 @@ def create_app() -> Flask:
     app.register_blueprint(leave_bp)
     app.register_blueprint(deductions_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(expense_claims_bp)
+    app.register_blueprint(expense_categories_bp)
 
     @app.route("/api/health")
     def health():

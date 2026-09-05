@@ -1,36 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { templatesAPI } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import { useLang } from '@/context/LangContext'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { Icon } from '@/components/Icons'
 import { c as th } from '@/theme'
 import toast from 'react-hot-toast'
+const DesktopPermissionTemplatesPage = lazy(() => import('@/pages/desktop/PermissionTemplatesPage')) // see App.jsx's top comment - split out of the initial bundle
 
-const ALL_NODES = {
-  'users.view_list':'View all user accounts','users.create':'Create a new user account',
-  'users.edit':'Edit user details','users.deactivate':'Deactivate / reactivate users',
-  'users.reset_password':'Reset user password','users.view_permissions':'View user permissions',
-  'users.edit_permissions':'Edit user permissions','users.assign_template':'Assign permission template',
-  'erp.view_employee_list':'View employee list from ERPNext','erp.sync_employee':'Sync employee from ERPNext',
-  'permission_templates.view':'View templates','permission_templates.create':'Create templates',
-  'permission_templates.edit':'Edit templates','permission_templates.delete':'Delete templates',
-  'timesheet.view_own':'View own timesheet entries','timesheet.view_all':'View all timesheets',
-  'timesheet.add_record':'Clock in/out (QR) or add manual entry','timesheet.edit_own':'Edit own entries',
-  'timesheet.edit_all':'Edit all entries','timesheet.delete_own':'Delete own entries',
-  'timesheet.delete_all':'Delete all entries','timesheet.approve':'Approve submissions',
-  'timesheet.submit_to_erp':'Push approved submissions to ERPNext',
-  'system.view_audit_log':'View audit log','system.manage_settings':'Manage system-wide settings (QR toggle etc.)',
-}
-
-const GROUPS = [
-  { label: 'Users',                icon: 'users',    prefix: 'users.' },
-  { label: 'ERP',                  icon: 'link',     prefix: 'erp.' },
-  { label: 'Permission Templates',    icon: 'shield',   prefix: 'permission_templates.' },
-  { label: 'Timesheets',           icon: 'clock',    prefix: 'timesheet.' },
-  { label: 'System',               icon: 'key',      prefix: 'system.' },
-]
-
-export default function PermissionTemplatesPage() {
+// Mobile version - desktop is pages/desktop/PermissionTemplatesPage.jsx
+// Permission catalogue is fetched from GET /permission-templates/nodes, not
+// hardcoded here - see app/utils/permissions.py in the server for why.
+function MobilePermissionTemplatesPage() {
   const { hasPermission } = useAuth()
   const { t } = useLang()
   const canCreate = hasPermission('permission_templates.create')
@@ -38,9 +19,12 @@ export default function PermissionTemplatesPage() {
   const canDelete = hasPermission('permission_templates.delete')
 
   const [templates, setTemplates] = useState([])
+  const [groups, setGroups] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => { templatesAPI.getNodes().then(({ data }) => setGroups(data.groups)).catch(() => toast.error('Failed to load the permission catalogue')) }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,7 +54,7 @@ export default function PermissionTemplatesPage() {
   }
 
   if (editing !== null) {
-    return <TemplateForm initial={editing === 'new' ? null : editing} onSave={save} onCancel={() => setEditing(null)} saving={saving} />
+    return <TemplateForm initial={editing === 'new' ? null : editing} groups={groups} onSave={save} onCancel={() => setEditing(null)} saving={saving} />
   }
 
   return (
@@ -141,15 +125,20 @@ export default function PermissionTemplatesPage() {
   )
 }
 
-function TemplateForm({ initial, onSave, onCancel, saving }) {
+export default function PermissionTemplatesPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobilePermissionTemplatesPage /> : <DesktopPermissionTemplatesPage />
+}
+
+function TemplateForm({ initial, groups, onSave, onCancel, saving }) {
   const { t } = useLang()
   const [name, setName] = useState(initial?.name || '')
   const [desc, setDesc] = useState(initial?.description || '')
   const [nodes, setNodes] = useState(new Set(initial?.nodes || []))
 
   const toggle = n => setNodes(prev => { const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s })
-  const toggleGroup = prefix => {
-    const gn = Object.keys(ALL_NODES).filter(n => n.startsWith(prefix))
+  const toggleGroup = groupNodes => {
+    const gn = Object.keys(groupNodes)
     const allOn = gn.every(n => nodes.has(n))
     setNodes(prev => { const s = new Set(prev); gn.forEach(n => allOn ? s.delete(n) : s.add(n)); return s })
   }
@@ -187,19 +176,21 @@ function TemplateForm({ initial, onSave, onCancel, saving }) {
         </div>
 
         <div style={F.groups}>
-          {GROUPS.map(g => {
-            const gNodes = Object.keys(ALL_NODES).filter(n => n.startsWith(g.prefix))
+          {!groups ? (
+            <div style={{ ...F.permTitle, fontWeight: 500, color: th.textMuted, textAlign: 'center', padding: '24px 0' }}>Loading permission catalogue…</div>
+          ) : groups.map(g => {
+            const gNodes = Object.keys(g.nodes)
             const allOn = gNodes.every(n => nodes.has(n))
             const someOn = gNodes.some(n => nodes.has(n))
             return (
-              <div key={g.prefix} style={F.group}>
+              <div key={g.key} style={F.group}>
                 <div style={F.groupHeader}>
                   <div style={F.groupLeft}>
                     <Icon name={g.icon} size={13} color={someOn ? th.navyMid : th.textMuted} />
                     <span style={{ ...F.groupName, color: someOn ? th.text : th.textSub }}>{g.label}</span>
                     {someOn && <span style={F.groupBadge}>{gNodes.filter(n => nodes.has(n)).length}/{gNodes.length}</span>}
                   </div>
-                  <button style={F.toggleBtn} onClick={() => toggleGroup(g.prefix)}>
+                  <button style={F.toggleBtn} onClick={() => toggleGroup(g.nodes)}>
                     {allOn ? t('deselect_all_perms') : t('select_all_perms')}
                   </button>
                 </div>
@@ -209,7 +200,7 @@ function TemplateForm({ initial, onSave, onCancel, saving }) {
                       <input type="checkbox" checked={nodes.has(n)} onChange={() => toggle(n)} style={{ flexShrink: 0 }} />
                       <div>
                         <div style={F.nodeName}>{n.split('.').slice(-1)[0].replace(/_/g, ' ')}</div>
-                        <div style={F.nodeDesc}>{ALL_NODES[n]}</div>
+                        <div style={F.nodeDesc}>{g.nodes[n]}</div>
                       </div>
                     </label>
                   ))}
@@ -221,7 +212,7 @@ function TemplateForm({ initial, onSave, onCancel, saving }) {
 
         <div style={F.actions}>
           <button style={F.cancelBtn} onClick={onCancel}>Cancel</button>
-          <button style={{ ...F.saveBtn, opacity: saving ? 0.7 : 1 }} onClick={handleSave} disabled={saving}>
+          <button style={{ ...F.saveBtn, opacity: (saving || !groups) ? 0.7 : 1 }} onClick={handleSave} disabled={saving || !groups}>
             {saving ? t('saving') : initial ? t('save_changes') : t('create_template')}
           </button>
         </div>

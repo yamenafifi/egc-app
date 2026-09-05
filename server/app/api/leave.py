@@ -25,6 +25,13 @@ from app.services.notification_service import notify, notify_by_erp_employee_id
 bp = Blueprint("leave", __name__, url_prefix="/api/leave")
 
 
+@bp.before_request
+def _require_leaves_module_enabled():
+    from app.services.settings_service import is_module_enabled
+    if not is_module_enabled("leaves"):
+        return jsonify({"error": "The Leaves module is currently disabled."}), 403
+
+
 @bp.route("/types", methods=["GET"])
 @jwt_required_custom
 def leave_types():

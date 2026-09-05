@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Navigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
@@ -9,9 +10,12 @@ import { normalizeSubmission } from '@/utils/requests'
 import { StatusBadge } from '@/components/requests/RequestRow'
 import RequestDetailSheet from '@/components/requests/RequestDetailSheet'
 
-export default function FinalApprovalPage() {
-  const isMobile = useIsMobile()
-
+// Mobile only - desktop's equivalent is the "Final Approval" tab inside
+// pages/desktop/TimesheetsPage.jsx (a real table, bulk selection, and a
+// row-click drawer showing the actual clock records before approving,
+// which this older bulk-checklist page never had). Kept here only for
+// mobile; desktop redirects below rather than rendering this separately.
+function MobileFinalApprovalPage() {
   const [items, setItems] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [detailItem, setDetailItem] = useState(null)
@@ -147,7 +151,7 @@ export default function FinalApprovalPage() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 8, marginTop: 16, position: isMobile ? 'sticky' : 'static', bottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, position: 'sticky', bottom: 16 }}>
             <button onClick={() => setRejecting(true)} disabled={selected.size === 0 || busy} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '13px', borderRadius: 10,
               border: `1px solid ${c.redBorder}`, background: c.redBg, color: c.red, fontSize: 14, fontWeight: 700,
@@ -168,24 +172,17 @@ export default function FinalApprovalPage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Final Approval" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        <RequestDetailSheet item={detailItem} mode="final" onClose={() => setDetailItem(null)} onActioned={load} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Final Approval</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Supervisor-approved submissions awaiting final approval before they reach payroll.</p>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Final Approval" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <RequestDetailSheet item={detailItem} mode="final" onClose={() => setDetailItem(null)} onActioned={load} />
     </div>
   )
+}
+
+export default function FinalApprovalPage() {
+  const isMobile = useIsMobile()
+  if (isMobile) return <MobileFinalApprovalPage />
+  return <Navigate to="/attendance?tab=final" replace />
 }

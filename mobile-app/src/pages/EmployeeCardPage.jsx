@@ -7,13 +7,8 @@ import { c } from '@/theme'
 import { PageWrap, PageHeader, Card, LoadingBlock } from '@/components/Shared'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { PrimaryButton } from '@/desktop/components/Page'
 
-const ERP_BASE = 'https://erp.egc-me.com'
-function erpUrl(path) {
-  if (!path) return null
-  if (path.startsWith('http')) return path
-  return `${ERP_BASE}${path}`
-}
 
 export default function EmployeeCardPage() {
   const { user } = useAuth()
@@ -46,7 +41,10 @@ export default function EmployeeCardPage() {
   const ini = name => name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 
   // Photo: prefer ERP employee image field, then the portal erp_photo_url
-  const photoSrc = erpUrl(emp?.image) || erpUrl(emp?.custom_iqamaid_image) || user?.erp_photo_url || null
+  // The backend already resolves these to full URLs (erp_service.py's
+  // resolve_file_url, using the live-configured ERPNext base URL) -
+  // never rebuild one here.
+  const photoSrc = emp?.image || emp?.custom_iqamaid_image || user?.erp_photo_url || null
 
   const isMobile = useIsMobile()
 
@@ -67,9 +65,7 @@ export default function EmployeeCardPage() {
           title="Employee Card"
           sub="Your digital EGC employee identification card"
           action={emp && (
-            <button onClick={downloadCard} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', background: c.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: c.font, boxShadow: `0 2px 6px ${c.primary}40` }}>
-              <Icon name="download" size={14} color="#fff" /> Download Card
-            </button>
+            <PrimaryButton onClick={downloadCard} icon={<Icon name="download" size={14} />}>Download Card</PrimaryButton>
           )}
         />
       )}

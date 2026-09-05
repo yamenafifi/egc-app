@@ -1,4 +1,4 @@
-export const Icon = ({ name, size = 16, color = 'currentColor', style = {} }) => {
+export const Icon = ({ name, size = 16, color = 'currentColor', style = {}, className }) => {
   const p = { stroke: color, strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }
   const icons = {
     dashboard:    <><rect x="3" y="3" width="7" height="7" rx="1" {...p}/><rect x="14" y="3" width="7" height="7" rx="1" {...p}/><rect x="3" y="14" width="7" height="7" rx="1" {...p}/><rect x="14" y="14" width="7" height="7" rx="1" {...p}/></>,
@@ -53,9 +53,10 @@ export const Icon = ({ name, size = 16, color = 'currentColor', style = {} }) =>
     passport:     <><rect x="4" y="2" width="16" height="20" rx="2" {...p}/><circle cx="12" cy="10" r="3" {...p}/><path d="M8 17h8M9 14h6" {...p}/></>,
     image:        <><rect x="3" y="3" width="18" height="18" rx="2" ry="2" {...p}/><circle cx="8.5" cy="8.5" r="1.5" {...p}/><polyline points="21 15 16 10 5 21" {...p}/></>,
     mapPin:       <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" {...p}/><circle cx="12" cy="10" r="3" {...p}/></>,
+    monitor:      <><rect x="2" y="3" width="20" height="14" rx="2" ry="2" {...p}/><line x1="8" y1="21" x2="16" y2="21" {...p}/><line x1="12" y1="17" x2="12" y2="21" {...p}/></>,
   }
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, ...style }}>
+    <span className={className} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, ...style }}>
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         {icons[name] || null}
       </svg>

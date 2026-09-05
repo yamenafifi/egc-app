@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
@@ -11,6 +11,7 @@ import { normalizeSubmission, sortByMostRecent } from '@/utils/requests'
 import AttendanceCalendar from '@/components/attendance/AttendanceCalendar'
 import RequestRow from '@/components/requests/RequestRow'
 import RequestDetailSheet from '@/components/requests/RequestDetailSheet'
+const DesktopTimesheetsPage = lazy(() => import('@/pages/desktop/TimesheetsPage')) // see App.jsx's top comment - split out of the initial bundle
 
 function UnsubmittedSection({ records, onSubmitted }) {
   const [selected, setSelected] = useState(new Set())
@@ -68,8 +69,9 @@ function UnsubmittedSection({ records, onSubmitted }) {
   )
 }
 
-export default function AttendancePage() {
-  const isMobile = useIsMobile()
+// The mobile Attendance card list. Desktop is pages/desktop/TimesheetsPage.jsx -
+// a real data table, a separate page entirely, picked below.
+function MobileAttendancePage() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -198,24 +200,16 @@ export default function AttendancePage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Attendance" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Attendance</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Your attendance calendar and submissions, and anything awaiting your review.</p>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Attendance" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <RequestDetailSheet item={selected?.item} mode={selected?.mode} onClose={() => setSelected(null)} onActioned={handleActioned} />
     </div>
   )
+}
+
+export default function AttendancePage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileAttendancePage /> : <DesktopTimesheetsPage />
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
 import { Icon } from '@/components/Icons'
@@ -6,6 +6,7 @@ import { PageTopBar } from '@/components/ui/TopBar'
 import BottomSheet from '@/components/ui/BottomSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { deductionsAPI } from '@/services/api'
+const DesktopMyDeductionsPage = lazy(() => import('@/pages/desktop/MyDeductionsPage')) // see App.jsx's top comment - split out of the initial bundle
 
 function fmtDate(iso) {
   if (!iso) return '—'
@@ -66,8 +67,7 @@ function AppealSheet({ deduction, onClose, onActioned }) {
   )
 }
 
-export default function MyDeductionsPage() {
-  const isMobile = useIsMobile()
+function MobileMyDeductionsPage() {
   const [deductions, setDeductions] = useState(null)
   const [appealing, setAppealing] = useState(null)
 
@@ -130,24 +130,16 @@ export default function MyDeductionsPage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="My Deductions" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        <AppealSheet deduction={appealing} onClose={() => setAppealing(null)} onActioned={load} />
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>My Deductions</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Deductions recorded against your pay. You can appeal any that hasn't already been appealed.</p>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="My Deductions" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <AppealSheet deduction={appealing} onClose={() => setAppealing(null)} onActioned={load} />
     </div>
   )
+}
+
+export default function MyDeductionsPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileMyDeductionsPage /> : <DesktopMyDeductionsPage />
 }

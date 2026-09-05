@@ -4,19 +4,30 @@ egc_hr Integration Service
 All communication with egc_hr's versioned API
 (api/method/egc_hr.egc_hr.api.v1.*) is centralised here - a distinct
 surface from erp_service.py's stock ERPNext REST calls, even though both
-usually point at the same physical Frappe site (see
-config.settings.Config.EGC_HR_BASE_URL). This is the ONLY correct way to
-feed approved attendance into payroll and to create/action Leave
-Applications - never build a raw ERPNext Timesheet/Leave Application
-directly (see the now-dead ERPNextService.push_timesheet() for what NOT
-to do: it bypasses egc_hr's entire Work Record/payroll pipeline).
+usually point at the same physical Frappe site.
+
+Base URL and credentials are read fresh from
+app/services/settings_service.py on every request, the same as
+erp_service.py - see that module's docstring for why: this used to be a
+second, independently-configured credential pair that could silently
+drift out of sync with the "main" ERP one, breaking every egc_hr-backed
+feature (attendance, leave, deductions, project sites) while
+ERPNext-direct features kept working fine. Settings > General > EGC ERP
+API Integration is now the one place both pairs are managed.
+
+This is the ONLY correct way to feed approved attendance into payroll
+and to create/action Leave Applications - never build a raw ERPNext
+Timesheet/Leave Application directly (see the now-dead
+ERPNextService.push_timesheet() for what NOT to do: it bypasses egc_hr's
+entire Work Record/payroll pipeline).
 
 See docs/EGC_APP_INTEGRATION.md in the egc-erp-hr repo for the full
 contract every method here wraps.
 """
 
 import requests
-from config.settings import Config
+
+from app.services.settings_service import get_erp_credentials
 
 
 class EGCHRError(Exception):
@@ -27,24 +38,27 @@ class EGCHRError(Exception):
 
 
 class EGCHRService:
-    BASE_URL = Config.EGC_HR_BASE_URL.rstrip("/")
     METHOD_PREFIX = "api/method/egc_hr.egc_hr.api.v1"  # dotted - joined with "." below, not "/"
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"token {Config.EGC_HR_API_KEY}:{Config.EGC_HR_API_SECRET}",
+
+    def _headers(self) -> dict:
+        creds = get_erp_credentials()
+        return {
+            "Authorization": f"token {creds['egc_hr_api_key']}:{creds['egc_hr_api_secret']}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-        })
+        }
 
     def _url(self, method_path: str) -> str:
-        return f"{self.BASE_URL}/{self.METHOD_PREFIX}.{method_path.lstrip('/')}"
+        base_url = get_erp_credentials()["egc_hr_base_url"].rstrip("/")
+        return f"{base_url}/{self.METHOD_PREFIX}.{method_path.lstrip('/')}"
 
     def _get(self, method_path, params=None):
         url = self._url(method_path)
         try:
-            resp = self.session.get(url, params=params, timeout=15)
+            resp = self.session.get(url, params=params, headers=self._headers(), timeout=15)
             resp.raise_for_status()
             return resp.json().get("message", {})
         except requests.exceptions.ConnectionError:
@@ -57,7 +71,7 @@ class EGCHRService:
     def _post(self, method_path, data):
         url = self._url(method_path)
         try:
-            resp = self.session.post(url, json=data, timeout=20)
+            resp = self.session.post(url, json=data, headers=self._headers(), timeout=20)
             resp.raise_for_status()
             return resp.json().get("message", {})
         except requests.exceptions.ConnectionError:
@@ -66,6 +80,21 @@ class EGCHRService:
             raise EGCHRError("egc_hr request timed out", 504)
         except requests.exceptions.HTTPError:
             raise EGCHRError(f"egc_hr returned {resp.status_code}: {resp.text}", resp.status_code)
+
+    def ping(self) -> bool:
+        # A generic, always-whitelisted core Frappe method - works
+        # regardless of what egc_hr's own API surface looks like, same
+        # idea as ERPNextService.ping().
+        base_url = get_erp_credentials()["egc_hr_base_url"].rstrip("/")
+        try:
+            resp = self.session.get(
+                f"{base_url}/api/method/frappe.auth.get_logged_user",
+                headers=self._headers(), timeout=10,
+            )
+            resp.raise_for_status()
+            return True
+        except requests.exceptions.RequestException:
+            return False
 
     # ── Work Record (attendance) ────────────────────────────────────────────
     #

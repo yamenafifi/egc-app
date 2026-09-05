@@ -5,16 +5,18 @@
   "dependencies": {
     "axios": "^1.7.2",
     "html2canvas": "^1.4.1",
-    "lucide-react": "^0.383.0",
-    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-barcode": "^1.6.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
-    "react-router-dom": "^6.23.1"
+    "react-router-dom": "^6.23.1",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.19",
     "vite": "^5.2.13"
   },
   "scripts": {

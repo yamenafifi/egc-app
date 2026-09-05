@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authAPI } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
@@ -7,12 +7,12 @@ import { c } from '@/theme'
 import toast from 'react-hot-toast'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
+const DesktopSettingsPage = lazy(() => import('@/pages/desktop/SettingsPage')) // see App.jsx's top comment - split out of the initial bundle
 
-export default function SettingsPage() {
+function MobileSettingsPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const isMobile = useIsMobile()
-  
+
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [pushEnabled, setPushEnabled] = useState(false)
@@ -49,7 +49,7 @@ export default function SettingsPage() {
   }
 
   const content = (
-    <div style={{ padding: isMobile ? '20px 16px' : '20px 0', display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
+    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
       
       {/* Change Password Block */}
       <div 
@@ -132,8 +132,13 @@ export default function SettingsPage() {
 
   return (
     <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-      {isMobile ? <PageTopBar title="Settings" /> : <h1 style={{ margin: '0 0 24px', fontSize: 22, fontWeight: 800, color: c.text }}>Settings</h1>}
+      <PageTopBar title="Settings" />
       {content}
     </div>
   )
+}
+
+export default function SettingsPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileSettingsPage /> : <DesktopSettingsPage />
 }

@@ -39,13 +39,22 @@ from app.services.notification_service import notify, notify_by_erp_employee_id,
 
 bp = Blueprint("attendance", __name__, url_prefix="/api/attendance")
 
+
+@bp.before_request
+def _require_timesheet_module_enabled():
+    from app.services.settings_service import is_module_enabled
+    if not is_module_enabled("timesheet"):
+        return jsonify({"error": "The Timesheet module is currently disabled."}), 403
+
 ACTIVITY_TYPE = "Execution"  # must exist as an ERPNext Activity Type - see import_record's contract
 
 # A standard day is 9 hours clock-in to clock-out (8 worked + 1 break).
 # Anything past that, at clock-out, becomes overtime automatically - the
 # employee never enters a number themselves.
-STANDARD_WORKDAY_HOURS = 8
-BREAK_HOURS = 1
+# Configurable via Settings > Timesheet (see settings_service.py's
+# TIMESHEET_SETTINGS_DEFAULTS) - these were hardcoded constants; a
+# standard workday length is a company policy decision, not a code
+# constant.
 
 
 @bp.route("/sites", methods=["GET"])
@@ -135,9 +144,14 @@ def clock_out():
     if site:
         status, distance_m = geofence_status(lat, lon, site)
 
+    from app.services.settings_service import get_timesheet_settings
+    ts_settings = get_timesheet_settings()
+
     now = datetime.now(timezone.utc)
     hours = round((now - rec["clock_in"]).total_seconds() / 3600, 2)
-    overtime_requested = max(0, round(hours - BREAK_HOURS - STANDARD_WORKDAY_HOURS, 2))
+    overtime_requested = max(0, round(
+        hours - ts_settings["timesheet_break_hours"] - ts_settings["timesheet_standard_workday_hours"], 2
+    ))
 
     db[ClockRecordModel.COLLECTION].update_one(
         {"_id": rec["_id"]},
@@ -191,6 +205,7 @@ def create_submission():
         return jsonify({"error": "One or more records were not found, not yours, or not closed."}), 400
 
     total_hours = sum(r.get("hours") or 0 for r in records)
+    total_overtime_hours = sum(r.get("overtime_hours_requested") or 0 for r in records)
     project_ids = sorted({r["project_id"] for r in records})
     period_start = min(r["clock_in"] for r in records)
     period_end = max(r["clock_out"] for r in records)
@@ -200,6 +215,7 @@ def create_submission():
         erp_employee_id=user.get("erp_employee_id"),
         record_ids=record_ids, project_ids=project_ids,
         total_hours=round(total_hours, 2), period_start=period_start, period_end=period_end,
+        total_overtime_hours=round(total_overtime_hours, 2),
     )
     result = db[TimesheetSubmissionModel.COLLECTION].insert_one(doc)
     submission_id = str(result.inserted_id)

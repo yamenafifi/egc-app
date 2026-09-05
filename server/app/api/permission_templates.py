@@ -7,6 +7,8 @@ GET    /api/permission-templates/<id>
 PUT    /api/permission-templates/<id>
 DELETE /api/permission-templates/<id>
 POST   /api/permission-templates/<id>/apply/<user_id>
+GET    /api/permission-templates/nodes    — the full permission-node catalogue,
+                                             grouped for the template editor UI
 """
 
 from datetime import datetime, timezone
@@ -16,9 +18,18 @@ from bson import ObjectId
 from app.middleware.auth_middleware import require_permission
 from app.models.permission_template import PermissionTemplateModel
 from app.utils.database import get_db
-from app.utils.permissions import ALL_NODES
+from app.utils.permissions import ALL_NODES, NODE_GROUPS
 
 bp = Blueprint("permission_templates", __name__, url_prefix="/api/permission-templates")
+
+
+@bp.route("/nodes", methods=["GET"])
+@require_permission("permission_templates.view")
+def list_nodes():
+    # app/utils/permissions.py is the one source of truth - the frontend
+    # used to hardcode its own copy of this catalogue and it silently
+    # drifted out of sync with every permission node added since.
+    return jsonify({"groups": NODE_GROUPS}), 200
 
 
 @bp.route("", methods=["GET"])

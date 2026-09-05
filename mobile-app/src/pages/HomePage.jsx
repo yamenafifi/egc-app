@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
@@ -9,6 +9,7 @@ import { AppTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { attendanceAPI, leaveAPI, deductionsAPI } from '@/services/api'
 import CheckInSheet from '@/components/attendance/CheckInSheet'
+const DesktopDashboardPage = lazy(() => import('@/pages/desktop/DashboardPage')) // see App.jsx's top comment - split out of the initial bundle
 
 function formatElapsed(ms) {
   const totalMin = Math.max(0, Math.floor(ms / 60000))
@@ -38,10 +39,13 @@ function ReminderCard({ icon, title, subtitle, onClick }) {
   )
 }
 
-export default function HomePage() {
-  const { user, hasPermission } = useAuth()
+// The mobile home screen - a to-do list (clock in/out + reminders + quick
+// links). Desktop is a genuinely different page (pages/desktop/DashboardPage.jsx,
+// a stats/chart/activity dashboard) picked below rather than a wide-screen
+// variant of this one.
+function MobileHomePage() {
+  const { user, hasPermission, isModuleEnabled } = useAuth()
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
 
   const [openRecord, setOpenRecord] = useState(undefined) // undefined = loading, null = none
   const [checkSheet, setCheckSheet] = useState(null) // 'in' | 'out' | null
@@ -54,36 +58,46 @@ export default function HomePage() {
   const [finalApprovalCount, setFinalApprovalCount] = useState(0)
   const [deductionReviewCount, setDeductionReviewCount] = useState(0)
 
-  const canFinalApprove = hasPermission('attendance.final_approve')
-  const canReviewDeductions = hasPermission('deductions.review')
+  const timesheetOn = isModuleEnabled('timesheet')
+  const leavesOn = isModuleEnabled('leaves')
+  const deductionsOn = isModuleEnabled('deductions')
+  const expensesOn = isModuleEnabled('expense_claims')
+  const canFinalApprove = timesheetOn && hasPermission('attendance.final_approve')
+  const canReviewDeductions = deductionsOn && hasPermission('deductions.review')
 
   const loadOpenRecord = useCallback(async () => {
+    if (!timesheetOn) { setOpenRecord(null); return }
     try {
       const { data } = await attendanceAPI.myOpenRecord()
       setOpenRecord(data.record)
     } catch {
       setOpenRecord(null)
     }
-  }, [])
+  }, [timesheetOn])
 
   const loadUnsubmitted = useCallback(async () => {
+    if (!timesheetOn) { setUnsubmitted([]); return }
     try {
       const { data } = await attendanceAPI.myRecords()
       setUnsubmitted((data.records || []).filter(r => r.status === 'closed'))
     } catch {
       setUnsubmitted([])
     }
-  }, [])
+  }, [timesheetOn])
 
   const loadReminders = useCallback(async () => {
-    try {
-      const { data } = await attendanceAPI.teamSubmissions()
-      setTeamAttendanceCount((data.submissions || []).length)
-    } catch { setTeamAttendanceCount(0) }
-    try {
-      const { data } = await leaveAPI.teamRequests()
-      setTeamLeaveCount((data.requests || []).length)
-    } catch { setTeamLeaveCount(0) }
+    if (timesheetOn) {
+      try {
+        const { data } = await attendanceAPI.teamSubmissions()
+        setTeamAttendanceCount((data.submissions || []).length)
+      } catch { setTeamAttendanceCount(0) }
+    }
+    if (leavesOn) {
+      try {
+        const { data } = await leaveAPI.teamRequests()
+        setTeamLeaveCount((data.requests || []).length)
+      } catch { setTeamLeaveCount(0) }
+    }
     if (canFinalApprove) {
       try {
         const { data } = await attendanceAPI.pendingFinalApproval()
@@ -98,7 +112,7 @@ export default function HomePage() {
         setDeductionReviewCount((reqData.requests || []).length + (appealData.deductions || []).length)
       } catch { setDeductionReviewCount(0) }
     }
-  }, [canFinalApprove, canReviewDeductions])
+  }, [timesheetOn, leavesOn, canFinalApprove, canReviewDeductions])
 
   useEffect(() => { loadOpenRecord(); loadUnsubmitted(); loadReminders() }, [loadOpenRecord, loadUnsubmitted, loadReminders])
 
@@ -126,14 +140,14 @@ export default function HomePage() {
     || 'there'
 
   const quickLinks = [
-    { icon: 'calendar',    label: 'Request Leave',      onClick: () => navigate('/leave/new') },
-    { icon: 'alertCircle', label: 'Flag a Deduction',   onClick: () => navigate('/deductions/new') },
-    { icon: 'creditCard',  label: 'My Deductions',       onClick: () => navigate('/deductions/mine') },
+    leavesOn && { icon: 'calendar',    label: 'Request Leave',      onClick: () => navigate('/leave/new') },
+    deductionsOn && { icon: 'alertCircle', label: 'Flag a Deduction',   onClick: () => navigate('/deductions/new') },
+    deductionsOn && { icon: 'creditCard',  label: 'My Deductions',       onClick: () => navigate('/deductions/mine') },
+    expensesOn && { icon: 'dollarSign',  label: 'Claim an Expense',   onClick: () => navigate('/expense-claims/new') },
+    expensesOn && { icon: 'fileText',    label: 'My Expense Claims',  onClick: () => navigate('/expense-claims/mine') },
     { icon: 'idCard',      label: 'Employee Card',       onClick: () => navigate('/employee-card') },
     { icon: 'passport',    label: 'Documents',            onClick: () => navigate('/legal-documents') },
-    { icon: 'dollarSign',  label: 'Claim an Expense',   onClick: () => {} },
-    { icon: 'fileText',    label: 'View Salary Slips',  onClick: () => {} },
-  ]
+  ].filter(Boolean)
 
   const elapsed = openRecord ? formatElapsed(now - new Date(openRecord.clock_in).getTime()) : null
   const erpLinked = !!user?.erp_employee_id
@@ -143,39 +157,42 @@ export default function HomePage() {
     || finalApprovalCount > 0 || deductionReviewCount > 0
 
   const content = (
-    <div style={{ padding: isMobile ? '16px 16px 32px' : '0', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: isMobile ? '100%' : 640 }}>
-
+    <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: '100%' }}>
       {/* Greeting card */}
       <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: `1px solid ${c.border}` }}>
-        <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, color: c.text, marginBottom: 1 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: c.text, marginBottom: 1 }}>
           Hey, {firstName} 👋
         </div>
         {user?.display_name && (
-          <div style={{ fontSize: 13, color: c.textMuted, marginBottom: 14, direction: 'rtl', textAlign: 'left' }}>
+          <div style={{ fontSize: 13, color: c.textMuted, marginBottom: timesheetOn ? 14 : 0, direction: 'rtl', textAlign: 'left' }}>
             {user.display_name}
           </div>
         )}
-        <button
-          disabled={checkInDisabled}
-          onClick={() => setCheckSheet(openRecord ? 'out' : 'in')}
-          style={{
-            width: '100%', padding: '11px',
-            background: openRecord ? c.redBg : c.primaryDark,
-            border: openRecord ? `1px solid ${c.redBorder}` : 'none',
-            borderRadius: 10, cursor: checkInDisabled ? 'default' : 'pointer',
-            opacity: checkInDisabled ? 0.5 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            fontFamily: c.font, fontSize: 14, fontWeight: 700, color: openRecord ? c.red : '#fff',
-          }}>
-          {openRecord ? 'Check Out' : 'Check In'}
-          <Icon name={openRecord ? 'stopCircle' : 'arrowRightCircle'} size={16} color={openRecord ? c.red : '#fff'} />
-        </button>
-        <div style={{ textAlign: 'center', fontSize: 11, color: c.textMuted, marginTop: 6 }}>
-          {openRecord === undefined ? 'Checking status…'
-            : !erpLinked ? 'Your account is not linked to an ERP employee record'
-            : openRecord ? `${openRecord.project_name} · ${elapsed} elapsed`
-            : 'Not clocked in'}
-        </div>
+        {timesheetOn && (
+          <>
+            <button
+              disabled={checkInDisabled}
+              onClick={() => setCheckSheet(openRecord ? 'out' : 'in')}
+              style={{
+                width: '100%', padding: '11px',
+                background: openRecord ? c.redBg : c.primaryDark,
+                border: openRecord ? `1px solid ${c.redBorder}` : 'none',
+                borderRadius: 10, cursor: checkInDisabled ? 'default' : 'pointer',
+                opacity: checkInDisabled ? 0.5 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                fontFamily: c.font, fontSize: 14, fontWeight: 700, color: openRecord ? c.red : '#fff',
+              }}>
+              {openRecord ? 'Check Out' : 'Check In'}
+              <Icon name={openRecord ? 'stopCircle' : 'arrowRightCircle'} size={16} color={openRecord ? c.red : '#fff'} />
+            </button>
+            <div style={{ textAlign: 'center', fontSize: 11, color: c.textMuted, marginTop: 6 }}>
+              {openRecord === undefined ? 'Checking status…'
+                : !erpLinked ? 'Your account is not linked to an ERP employee record'
+                : openRecord ? `${openRecord.project_name} · ${elapsed} elapsed`
+                : 'Not clocked in'}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Action reminders - each one only exists while it's actually true */}
@@ -248,33 +265,20 @@ export default function HomePage() {
     </div>
   )
 
-  const sheets = (
-    <CheckInSheet
-      open={!!checkSheet} mode={checkSheet} openRecord={openRecord}
-      onClose={() => setCheckSheet(null)}
-      onDone={() => { loadOpenRecord(); loadUnsubmitted() }}
-    />
-  )
-
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <AppTopBar user={user} onAvatarClick={() => navigate('/profile')} />
-        {content}
-        {sheets}
-      </div>
-    )
-  }
-
-  // Desktop — no mobile top bar, just content inside the AppLayout main area
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Home</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Welcome back, {user?.en_display_name || user?.display_name}</p>
-      </div>
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <AppTopBar user={user} onAvatarClick={() => navigate('/profile')} />
       {content}
-      {sheets}
+      <CheckInSheet
+        open={!!checkSheet} mode={checkSheet} openRecord={openRecord}
+        onClose={() => setCheckSheet(null)}
+        onDone={() => { loadOpenRecord(); loadUnsubmitted() }}
+      />
     </div>
   )
+}
+
+export default function HomePage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileHomePage /> : <DesktopDashboardPage />
 }

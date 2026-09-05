@@ -14,16 +14,11 @@ from app.models.audit_log import AuditLogModel
 from app.utils.permissions import SYSADMIN_NODES
 from app.services.erp_service import erp_service
 
-
-def _build_erp_url(path: str | None) -> str | None:
-    """Convert an ERP relative file path to an absolute URL."""
-    if not path:
-        return None
-    if path.startswith("http"):
-        return path
-    from config.settings import Config
-    base = Config.ERP_BASE_URL.rstrip("/")
-    return f"{base}{path}"
+# erp_service.resolve_file_url() is the one place a relative ERPNext file
+# path gets turned into an absolute URL, built from the live configured
+# erp_base_url (Settings > EGC ERP API Integration) - never hardcode or
+# re-derive it here.
+_build_erp_url = erp_service.resolve_file_url
 
 
 class AuthError(Exception):

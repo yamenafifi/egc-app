@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { c } from '@/theme'
@@ -7,9 +7,7 @@ import MenuList from '@/components/ui/MenuList'
 import BottomSheet from '@/components/ui/BottomSheet'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
-
-const ERP_BASE = 'https://erp.egc-me.com'
-function erpUrl(p) { if (!p) return null; return p.startsWith('http') ? p : `${ERP_BASE}${p}` }
+const DesktopProfilePage = lazy(() => import('@/pages/desktop/ProfilePage')) // see App.jsx's top comment - split out of the initial bundle
 
 function DetailSheet({ open, onClose, title, rows }) {
   return (
@@ -26,22 +24,21 @@ function DetailSheet({ open, onClose, title, rows }) {
   )
 }
 
-export default function ProfilePage() {
+function MobileProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
   const [sheet, setSheet] = useState(null)
   const [photoErr, setPhotoErr] = useState(false)
 
   const initials = user?.display_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
-  const photoSrc = erpUrl(user?.erp_photo_url)
+  // Already a full URL - resolved server-side (auth_service.py) against
+  // the live-configured ERPNext base URL, never rebuilt here.
+  const photoSrc = user?.erp_photo_url
   const handleLogout = async () => { await logout(); navigate('/login') }
 
   const profileMenu = [
     { icon: 'user',       label: 'Employee Details',    onClick: () => setSheet('employee') },
-    { icon: 'fileText',   label: 'Company Information', onClick: () => {} },
     { icon: 'creditCard', label: 'Contact Information', onClick: () => setSheet('contact') },
-    { icon: 'dollarSign', label: 'Salary Information',  onClick: () => {} },
   ]
   const settingsMenu = [
     { icon: 'settings', label: 'Settings', onClick: () => navigate('/settings') },
@@ -80,56 +77,30 @@ export default function ProfilePage() {
     </>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Profile" />
-        <div style={{ padding: '24px 16px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingTop: 8 }}>
-            {avatar()}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: c.text }}>{user?.en_display_name || user?.display_name}</div>
-              {user?.en_display_name && <div style={{ fontSize: 13, color: c.textMuted, marginTop: 2, direction: 'rtl' }}>{user.display_name}</div>}
-              {(user?.designation_en || user?.designation) && <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{user.designation_en || user.designation}</div>}
-            </div>
-          </div>
-          <MenuList items={profileMenu} />
-          <MenuList items={settingsMenu} />
-          <button onClick={handleLogout} style={{ width: '100%', padding: '14px', background: '#fff', border: `1px solid ${c.redBorder}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: c.font, fontSize: 14, fontWeight: 500, color: c.red }}>
-            <Icon name="logout" size={16} color={c.red} /> Log Out
-          </button>
-        </div>
-        {sheets}
-      </div>
-    )
-  }
-
-  // Desktop
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Profile</h1>
-      </div>
-      <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', maxWidth: 780 }}>
-        {/* Left: avatar + name */}
-        <div style={{ width: 220, flexShrink: 0, background: '#fff', borderRadius: 14, border: `1px solid ${c.border}`, padding: '28px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          {avatar(76, 22)}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Profile" />
+      <div style={{ padding: '24px 16px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingTop: 8 }}>
+          {avatar()}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: c.text }}>{user?.en_display_name || user?.display_name}</div>
-            {user?.en_display_name && <div style={{ fontSize: 12, color: c.textMuted, marginTop: 2, direction: 'rtl' }}>{user.display_name}</div>}
-            {(user?.designation_en || user?.designation) && <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4 }}>{user.designation_en || user.designation}</div>}
+            <div style={{ fontSize: 17, fontWeight: 700, color: c.text }}>{user?.en_display_name || user?.display_name}</div>
+            {user?.en_display_name && <div style={{ fontSize: 13, color: c.textMuted, marginTop: 2, direction: 'rtl' }}>{user.display_name}</div>}
+            {(user?.designation_en || user?.designation) && <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{user.designation_en || user.designation}</div>}
           </div>
         </div>
-        {/* Right: menus */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <MenuList items={profileMenu} />
-          <MenuList items={settingsMenu} />
-          <button onClick={handleLogout} style={{ width: '100%', padding: '12px', background: '#fff', border: `1px solid ${c.redBorder}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: c.font, fontSize: 13, fontWeight: 500, color: c.red }}>
-            <Icon name="logout" size={15} color={c.red} /> Log Out
-          </button>
-        </div>
+        <MenuList items={profileMenu} />
+        <MenuList items={settingsMenu} />
+        <button onClick={handleLogout} style={{ width: '100%', padding: '14px', background: '#fff', border: `1px solid ${c.redBorder}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: c.font, fontSize: 14, fontWeight: 500, color: c.red }}>
+          <Icon name="logout" size={16} color={c.red} /> Log Out
+        </button>
       </div>
       {sheets}
     </div>
   )
+}
+
+export default function ProfilePage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileProfilePage /> : <DesktopProfilePage />
 }

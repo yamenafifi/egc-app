@@ -1,4 +1,10 @@
-// BottomSheet — slide-up modal for mobile, centered dialog on desktop
+// BottomSheet — a slide-up modal docked to the bottom of the viewport
+// (capped at maxWidth 560), on mobile and desktop alike - there is no
+// desktop-specific centered variant. Fine for lightweight, single-purpose
+// modals (confirmations, small forms); a page whose "detail" IS the main
+// content on desktop (Attendance, Leaves, Deductions Review, Expense
+// Claims) uses an inline MasterDetail pane instead - see
+// components/layout/MasterDetail.jsx.
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { c } from '@/theme'

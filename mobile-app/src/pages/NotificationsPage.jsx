@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { useUnreadCount } from '@/hooks/useUnreadCount'
 import { notificationsAPI } from '@/services/api'
 import { registerPush, unregisterPush, getPushSubscriptionState } from '@/services/push'
+const DesktopNotificationsPage = lazy(() => import('@/pages/desktop/NotificationsPage')) // see App.jsx's top comment - split out of the initial bundle
 
 const TYPE_ICON = {
   leave_submitted: 'calendar', leave_approved: 'calendar', leave_rejected: 'calendar',
@@ -15,6 +16,10 @@ const TYPE_ICON = {
   timesheet_ready_for_final_approval: 'checkCircle',
   timesheet_approved: 'clock', timesheet_rejected: 'clock',
   timesheet_push_failed: 'alertCircle',
+  expense_claim_submitted: 'creditCard', expense_claim_ready_for_final_approval: 'creditCard',
+  expense_claim_rejected: 'alertCircle', expense_claim_final_rejected: 'alertCircle',
+  expense_claim_approved: 'checkCircle', expense_claim_push_failed: 'alertCircle',
+  expense_claim_extraction_completed: 'checkCircle', expense_claim_extraction_failed: 'alertCircle',
 }
 
 function fmtTime(iso) {
@@ -27,9 +32,8 @@ function fmtTime(iso) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
-export default function NotificationsPage() {
+function MobileNotificationsPage() {
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
   const { refresh: refreshUnread } = useUnreadCount()
 
   const [items, setItems] = useState(null)
@@ -148,21 +152,15 @@ export default function NotificationsPage() {
     </div>
   )
 
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Notifications" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Notifications</h1>
-      </div>
-      {body}
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Notifications" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
     </div>
   )
+}
+
+export default function NotificationsPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileNotificationsPage /> : <DesktopNotificationsPage />
 }

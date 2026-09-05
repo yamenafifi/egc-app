@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { c } from '@/theme'
@@ -7,6 +7,7 @@ import { PageTopBar } from '@/components/ui/TopBar'
 import BottomSheet from '@/components/ui/BottomSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { deductionsAPI } from '@/services/api'
+const DesktopDeductionsPage = lazy(() => import('@/pages/desktop/DeductionsPage')) // see App.jsx's top comment - split out of the initial bundle
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -229,8 +230,8 @@ function ResolveAppealSheet({ deduction, onClose, onActioned }) {
   )
 }
 
-export default function DeductionsReviewPage() {
-  const isMobile = useIsMobile()
+// Mobile: card list + bottom sheets. Desktop is pages/desktop/DeductionsPage.jsx.
+function MobileDeductionsReviewPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState(searchParams.get('tab') === 'appeals' ? 'appeals' : 'requests')
 
@@ -310,33 +311,19 @@ export default function DeductionsReviewPage() {
     </div>
   )
 
-  const sheets = (
-    <>
+  return (
+    <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
+      <PageTopBar title="Deductions" />
+      <div style={{ padding: '20px 16px 40px' }}>{body}</div>
       <ConvertRequestSheet request={openRequest} onClose={() => setOpenRequest(null)} onActioned={loadRequests} />
       <ResolveAppealSheet deduction={openAppeal} onClose={() => setOpenAppeal(null)} onActioned={loadAppeals} />
-    </>
-  )
-
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: '100%', background: c.bg, fontFamily: c.font }}>
-        <PageTopBar title="Deductions" />
-        <div style={{ padding: '20px 16px 40px' }}>{body}</div>
-        {sheets}
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ fontFamily: c.font, animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: c.text }}>Deductions</h1>
-        <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>Review supervisor requests and employee appeals.</p>
-      </div>
-      {body}
-      {sheets}
     </div>
   )
+}
+
+export default function DeductionsReviewPage() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileDeductionsReviewPage /> : <DesktopDeductionsPage />
 }
 
 const S = {

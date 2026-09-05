@@ -7,18 +7,13 @@ import { PageWrap, PageHeader, Card, LoadingBlock } from '@/components/Shared'
 import { PageTopBar } from '@/components/ui/TopBar'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
-const ERP_BASE = 'https://erp.egc-me.com'
-function erpUrl(path) {
-  if (!path) return null
-  if (path.startsWith('http')) return path
-  return `${ERP_BASE}${path}`
-}
-
 // ── IQAMA / ID Card ───────────────────────────────────────────────────────────
 function IqamaCard({ imageUrl }) {
   const [imgErr, setImgErr] = useState(false)
   const [zoomed, setZoomed] = useState(false)
-  const url = erpUrl(imageUrl)
+  // Already a full URL - erp_service.py's resolve_file_url() resolves it
+  // server-side against the live-configured ERPNext base URL.
+  const url = imageUrl
 
   if (!url) return (
     <Card style={{padding:'28px 24px',textAlign:'center'}}>
@@ -86,7 +81,7 @@ function IqamaCard({ imageUrl }) {
 
 // ── Passport ──────────────────────────────────────────────────────────────────
 function PassportCard({ pdfPath, emp }) {
-  const url = erpUrl(pdfPath)
+  const url = pdfPath
 
   const fields = [
     ['Full Name',    emp?.employee_name],

@@ -137,6 +137,7 @@ class TimesheetSubmissionModel:
         total_hours: float,
         period_start: datetime,
         period_end: datetime,
+        total_overtime_hours: float = 0,
     ) -> dict:
         now = datetime.now(timezone.utc)
         return {
@@ -147,6 +148,11 @@ class TimesheetSubmissionModel:
             "record_ids": record_ids,
             "project_ids": project_ids,
             "total_hours": total_hours,
+            # Summed from each bundled record's overtime_hours_requested at
+            # submission time - what the employee is actually claiming, not
+            # a live-updating figure if a reviewer later adjusts an
+            # individual record's overtime_hours_approved.
+            "total_overtime_hours": total_overtime_hours,
             "period_start": period_start,
             "period_end": period_end,
             "status": "pending",
@@ -177,6 +183,7 @@ class TimesheetSubmissionModel:
             "record_ids": sub.get("record_ids", []),
             "project_ids": sub.get("project_ids", []),
             "total_hours": sub.get("total_hours", 0),
+            "total_overtime_hours": sub.get("total_overtime_hours", 0),
             "status": sub["status"],
             "submitted_at": sub["submitted_at"].isoformat() if sub.get("submitted_at") else None,
             "reviewed_by": sub.get("reviewed_by"),

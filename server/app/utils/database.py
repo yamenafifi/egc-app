@@ -69,6 +69,11 @@ def init_indexes(db: Database):
     db.deduction_requests.create_index([("employee_erp_id", 1), ("submitted_at", -1)])
     db.deduction_requests.create_index("status")
 
+    # Expense claim applications
+    db.expense_claim_applications.create_index([("employee_user_id", 1), ("submitted_at", -1)])
+    db.expense_claim_applications.create_index("status")
+    db.expense_claim_applications.create_index("push_status")
+
 
 def init_timesheet_indexes(db: Database):
     """Alias kept for backward-compat — all indexes now live in init_indexes()."""

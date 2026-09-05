@@ -40,6 +40,13 @@ from app.services.notification_service import notify, notify_by_erp_employee_id,
 bp = Blueprint("deductions", __name__, url_prefix="/api/deductions")
 
 
+@bp.before_request
+def _require_deductions_module_enabled():
+    from app.services.settings_service import is_module_enabled
+    if not is_module_enabled("deductions"):
+        return jsonify({"error": "The Deductions module is currently disabled."}), 403
+
+
 def _caller_supervises_anything() -> bool:
     user = g.current_user
     if user.get("is_sysadmin"):
